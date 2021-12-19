@@ -1,26 +1,36 @@
 Nonterminals
-  program
-  exps exp
+  none
+  program top_compstmt top_stmts
+  expr
+  command_call command command_args
+  fcall
+  operation
+  op
   .
 
 Terminals
-  ';'
   var
+  tIDENTIFIER
   .
 
 Rootsymbol program.
 
-program ->
-  exps : '$1'.
+none -> var.
 
-exps ->
-  exp ';' exps :
-    [ '$1' | '$3' ].
+program -> top_compstmt.
 
-exp ->
-  var : '$1'.
+top_compstmt -> top_stmts.
+top_stmts -> expr.
 
+expr ->  command_call.
+
+command_call -> command.
+command -> fcall command_args.
+command_args -> none.
+
+fcall -> operation.
+operation -> op.
+op -> tIDENTIFIER.
 
 Erlang code.
-
 
