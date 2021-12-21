@@ -4,7 +4,7 @@
     {description, "beam ruby"},
     {vsn, "0.0.1"},
     {modules, []},
-    {registered, []},
+    {registered, [ruby_sup]},
     {applications, [kernel,stdlib,compiler]},
     {mod, {ruby,[]}},
     {env, []}
