@@ -1,0 +1,3 @@
+#!/bin/sh
+
+erl -pa ./lib/ruby/ebin -noshell -s ruby run_script -s erlang halt
