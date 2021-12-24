@@ -1,19 +1,19 @@
+# ---------- utils ----------
 Q := @
 
-# commands
+# ---------- commands ----------
 ERL := erl
 ERLC := erlc
 EMAKE := erl -make
 
-# files
-PARSER := lib/ruby/src/ruby_parser.erl
-AFILE := lib/ruby/ebin/ruby.app
-
-.PHONY: compile setup_dirs parser erlang clean
+.PHONY: compile setup_dirs parser erlang clean test
 
 default: compile
 
 # ---------- INSTALL ----------
+
+PARSER := lib/ruby/src/ruby_parser.erl
+AFILE := lib/ruby/ebin/ruby.app
 
 compile: setup_dirs $(PARSER) $(AFILE) erlang
 
@@ -35,11 +35,24 @@ erlang: $(PARSER)
 
 # ---------- TEST ----------
 
+TEST_EBIN = lib/ruby/test/ebin
+TEST_ERL_DIR = lib/ruby/test/erlang
+TEST_TARGETS = $(addprefix $(TEST_EBIN)/, $(addsuffix .beam, $(basename $(notdir $(wildcard $(TEST_ERL_DIR)/*.erl)))))
 
+test: compile $(TEST_TARGETS)
+	$(Q) echo ===== run tests =====
+	$(Q) $(ERL) -pa $(TEST_EBIN) -s test_helper test
+
+$(TEST_EBIN)/%.beam: $(TEST_ERL_DIR)/%.erl
+	$(Q) echo ===== compile for test: $< =====
+	$(Q) mkdir -p $(TEST_EBIN)
+	$(Q) $(ERLC) -o $(TEST_EBIN) $<
 
 # ---------- CLEANUP ----------
 
 clean:
 	$(Q) echo ===== cleanup files =====
-	rm -rf lib/*/ebin
+	rm -rf lib/*/ebin/
+	rm -rf lib/*/test/ebin/
+	rm -f erl_crush.dump
 	rm -rf $(PARSER)
