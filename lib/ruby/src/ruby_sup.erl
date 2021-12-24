@@ -1,9 +1,8 @@
 -module(ruby_sup).
+-export([init/1, start_link/0]).
 -behaviour(supervisor).
 
--export([init/1, start_link/0]).
-
-%% Callbacks
+%% callback apis
 
 start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, ok).
