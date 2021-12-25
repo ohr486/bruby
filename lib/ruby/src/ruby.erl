@@ -12,4 +12,5 @@ stop(_) -> ok.
 %% apis
 
 run_script() ->
-  io:put_chars("exec script").
+  ruby_utils:check_args(init:get_plain_arguments()),
+  erlang:halt(0).
