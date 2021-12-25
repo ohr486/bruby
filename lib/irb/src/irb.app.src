@@ -1,0 +1,12 @@
+{
+  application, irb,
+  [
+    {description, "interactive beam ruby"},
+    {vsn, "0.0.1"},
+    {modules, []},
+    {registered, []},
+    {applications, [kernel,stdlib,compiler]},
+    {mod, {irb,[]}},
+    {env, []}
+  ]
+}.
