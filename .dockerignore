@@ -1,0 +1,6 @@
+*.ez
+*.beam
+
+/lib/ruby/src/*_parser.erl
+/lib/*/ebin
+erl_crash.dump
