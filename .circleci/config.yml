@@ -10,13 +10,13 @@ jobs:
     working_directory: ~/repo
     steps:
       - checkout
-      - slack/notify:
-          event: always
       - run:
           command: make ci
+      - slack/notify:
+          event: always
 
 workflows:
-  build:
+  test:
     jobs:
       - test:
           context: ohr486-circleci-notification
