@@ -1,0 +1,22 @@
+version: 2.1
+
+orbs:
+  slack: circleci/slack@4.9.3
+
+jobs:
+  build:
+    docker:
+      - image: circleci/erlang:25
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run: env
+      - run: ls -alh
+      - slack/notify:
+          event: always
+
+workflows:
+  deploy:
+    jobs:
+      - build:
+          context: ohr486-circleci-notification
