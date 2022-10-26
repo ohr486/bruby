@@ -16,7 +16,7 @@ default: compile
 
 compile: compile_ruby compile_irb
 test: test_ruby test_irb
-
+ci: compile test
 
 
 # ---------- PRE BUILD RUBY ----------

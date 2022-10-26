@@ -12,7 +12,8 @@ jobs:
       - checkout
       - slack/notify:
           event: always
-      - make
+      - run:
+          command: make ci
 
 workflows:
   deploy:
