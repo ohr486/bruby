@@ -16,7 +16,7 @@ jobs:
           command: make ci
 
 workflows:
-  deploy:
+  build:
     jobs:
       - test:
           context: ohr486-circleci-notification
