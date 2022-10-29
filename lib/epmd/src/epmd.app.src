@@ -1,0 +1,12 @@
+{
+  application, epmd,
+  [
+    {description, "port map daemon for beam ruby"},
+    {vsn, "0.0.1"},
+    {modules, []},
+    {registered, []},
+    {applications, [kernel,stdlib,compiler]},
+    {mod, {epmd,[]}},
+    {env, []}
+  ]
+}.

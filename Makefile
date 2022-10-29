@@ -11,11 +11,12 @@ EMAKE := erl -make
 .PHONY: compile clean test erlang
 .PHONY: compile_ruby test_ruby setup_ruby_dirs erlang_for_ruby
 .PHONY: compile_irb test_irb setup_irb_dirs erlang_for_irb
+.PHONY: compile_epmd test_epmd setup_epmd_dirs erlang_for_epmd
 
 default: compile
 
-compile: compile_ruby compile_irb
-test: test_ruby test_irb
+compile: compile_ruby compile_irb compile_epmd
+test: test_ruby test_irb test_epmd
 ci: compile test
 
 
@@ -79,8 +80,6 @@ $(IRB_APP_FILE): $(IRB_APP_SRC_FILE)
 erlang_for_irb:
 	$(Q) cd lib/irb && $(EMAKE)
 
-
-
 # ---------- TEST IRB ----------
 
 TEST_IRB_EBIN = lib/irb/test/ebin
@@ -94,6 +93,41 @@ test_irb: compile_irb $(TEST_IRB_TARGETS)
 $(TEST_IRB_EBIN)/%.beam: $(TEST_IRB_ERL_DIR)/%.erl
 	$(Q) mkdir -p $(TEST_IRB_EBIN)
 	$(Q) $(ERLC) -o $(TEST_IRB_EBIN) $<
+
+
+
+# ---------- PRE BUILD EPMD ----------
+
+setup_epmd_dirs:
+	$(Q) cd lib/epmd && mkdir -p ebin
+
+# ---------- BUILD EPMD ----------
+
+EPMD_APP_FILE := lib/epmd/ebin/epmd.app
+EPMD_APP_SRC_FILE := lib/epmd/src/epmd.app.src
+
+compile_epmd: setup_epmd_dirs $(EPMD_APP_FILE) erlang_for_epmd
+
+$(EPMD_APP_FILE): $(EPMD_APP_SRC_FILE)
+	$(Q) echo ===== create epmd appfile
+	$(Q) cp $< $(EPMD_APP_FILE)
+
+erlang_for_epmd:
+	$(Q) cd lib/epmd && $(EMAKE)
+
+# ---------- TEST EPMD ----------
+
+TEST_EPMD_EBIN = lib/epmd/test/ebin
+TEST_EPMD_ERL_DIR = lib/epmd/test/erlang
+TEST_EPMD_TARGETS = $(addprefix $(TEST_EPMD_EBIN)/, $(addsuffix .beam, $(basename $(notdir $(wildcard $(TEST_EPMD_ERL_DIR)/*.erl)))))
+
+test_epmd: compile_ruby $(TEST_EPMD_TARGETS)
+	$(Q) echo ===== run epmd tests
+	$(Q) $(ERL) -pa $(TEST_EPMD_EBIN) -s test_helper test
+
+$(TEST_EPMD_EBIN)/%.beam: $(TEST_EPMD_ERL_DIR)/%.erl
+	$(Q) mkdir -p $(TEST_EPMD_EBIN)
+	$(Q) $(ERLC) -o $(TEST_EPMD_EBIN) $<
 
 
 
