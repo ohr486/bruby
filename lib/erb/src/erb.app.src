@@ -1,0 +1,12 @@
+{
+  application, erb,
+  [
+    {description, "template engine for beam ruby"},
+    {vsn, "0.0.1"},
+    {modules, []},
+    {registered, []},
+    {applications, [kernel,stdlib,compiler]},
+    {mod, {erb,[]}},
+    {env, []}
+  ]
+}.
