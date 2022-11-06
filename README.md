@@ -1,6 +1,6 @@
 # bruby
 
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ohr486/bruby/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/ohr486/bruby/tree/main)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/ohr486/bruby/tree/develop.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/ohr486/bruby/tree/develop)
 
 ## Build
 ```sh
@@ -14,6 +14,6 @@ make test
 
 ## Run Script
 ```sh
-./bin/ruby
+./bin/bruby
 ```
 
