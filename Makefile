@@ -12,12 +12,11 @@ EMAKE := erl -make
 .PHONY: compile_ruby test_ruby setup_ruby_dirs erlang_for_ruby
 .PHONY: compile_irb test_irb setup_irb_dirs erlang_for_irb
 .PHONY: compile_epmd test_epmd setup_epmd_dirs erlang_for_epmd
-.PHONY: compile_erb test_erb setup_erb_dirs erlang_for_erb
 
 default: compile
 
-compile: compile_ruby compile_irb compile_epmd compile_erb
-test: test_ruby test_irb test_epmd test_erb
+compile: compile_ruby compile_irb compile_epmd
+test: test_ruby test_irb test_epmd
 ci: compile test
 
 
@@ -129,41 +128,6 @@ test_epmd: compile_ruby $(TEST_EPMD_TARGETS)
 $(TEST_EPMD_EBIN)/%.beam: $(TEST_EPMD_ERL_DIR)/%.erl
 	$(Q) mkdir -p $(TEST_EPMD_EBIN)
 	$(Q) $(ERLC) -o $(TEST_EPMD_EBIN) $<
-
-
-
-# ---------- PRE BUILD ERB ----------
-
-setup_erb_dirs:
-	$(Q) cd lib/erb && mkdir -p ebin
-
-# ---------- BUILD ERB ----------
-
-ERB_APP_FILE := lib/erb/ebin/erb.app
-ERB_APP_SRC_FILE := lib/erb/src/erb.app.src
-
-compile_erb: setup_erb_dirs $(ERB_APP_FILE) erlang_for_erb
-
-$(ERB_APP_FILE): $(ERB_APP_SRC_FILE)
-	$(Q) echo ===== create erb appfile
-	$(Q) cp $< $(ERB_APP_FILE)
-
-erlang_for_erb:
-	$(Q) cd lib/erb && $(EMAKE)
-
-# ---------- TEST ERB ----------
-
-TEST_ERB_EBIN = lib/erb/test/ebin
-TEST_ERB_ERL_DIR = lib/erb/test/erlang
-TEST_ERB_TARGETS = $(addprefix $(TEST_ERB_EBIN)/, $(addsuffix .beam, $(basename $(notdir $(wildcard $(TEST_ERB_ERL_DIR)/*.erl)))))
-
-test_erb: compile_ruby $(TEST_ERB_TARGETS)
-	$(Q) echo ===== run erb tests
-	$(Q) $(ERL) -pa $(TEST_ERB_EBIN) -s test_helper test
-
-$(TEST_ERB_EBIN)/%.beam: $(TEST_ERB_ERL_DIR)/%.erl
-	$(Q) mkdir -p $(TEST_ERB_EBIN)
-	$(Q) $(ERLC) -o $(TEST_ERB_EBIN) $<
 
 
 
