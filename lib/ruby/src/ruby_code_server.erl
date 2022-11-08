@@ -22,11 +22,13 @@ handle_call({def_class, Class, Pid, Tuple}, _From, Config) ->
       {reply, {ok, Ref}, NewConfig};
     [CurrentTuple] ->
       {reply, {error, CurrentTuple}, Config}
-  end.
+  end;
 
 handle_call({undef_class, Ref}, _From, Config) ->
   {reply, ok, undef_class(Ref, Config)}.
 
+handle_cast(_Tuple, Config) ->
+  {noreply, Config}.
 
 %% private apis
 
