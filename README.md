@@ -17,3 +17,14 @@ make test
 ./bin/bruby
 ```
 
+## Run Test on Docker
+
+```sh
+cd docker
+./build.sh
+./run.sh
+
+make
+make test
+```
+
