@@ -1,0 +1,3 @@
+-module(epmd_sup).
+-export([init/1, start_link/0]).
+-behaviour(supervisor).
