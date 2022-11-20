@@ -1,5 +1,5 @@
 #!/bin/bash
 
-echo run bruby
+echo run bruby ...
 
 docker run --rm -it bruby bash
