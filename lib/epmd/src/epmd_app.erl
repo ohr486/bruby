@@ -3,6 +3,8 @@
 
 -export([start/0, start/2, stop/1]).
 
+%% callback apis
+
 start() ->
   start(normal, []).
 
