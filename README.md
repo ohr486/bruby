@@ -20,6 +20,8 @@ make test
 ## Run Test
 
 ```sh
+make
+make test
 ```
 
 ## Run Test on Docker
