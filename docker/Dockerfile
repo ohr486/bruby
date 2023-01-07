@@ -1,4 +1,4 @@
-FROM erlang:25.1
+FROM erlang:25.2
 
 RUN mkdir /buildroot
 WORKDIR /buildroot
