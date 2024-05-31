@@ -6,7 +6,7 @@ orbs:
 jobs:
   test:
     docker:
-      - image: circleci/erlang:27
+      - image: erlang:27
     working_directory: ~/repo
     steps:
       - checkout
