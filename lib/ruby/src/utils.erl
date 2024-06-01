@@ -1,4 +1,4 @@
--module(ruby_utils).
+-module(utils).
 
 -export([check_args/1]).
 
