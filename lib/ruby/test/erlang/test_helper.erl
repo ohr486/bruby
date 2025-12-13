@@ -11,6 +11,7 @@ test() ->
   Result = try
     test_tokenizer:test(),
     test_parser:test(),
+    test_evaluator:test(),
     success
   catch
     Error:Reason:Stacktrace ->
