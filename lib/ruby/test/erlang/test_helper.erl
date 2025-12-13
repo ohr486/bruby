@@ -7,9 +7,10 @@ test() ->
   io:format("Running bruby test suite~n"),
   io:format("========================================~n~n"),
 
-  % トークナイザーのテスト実行
+  % テスト実行
   Result = try
     test_tokenizer:test(),
+    test_parser:test(),
     success
   catch
     Error:Reason:Stacktrace ->

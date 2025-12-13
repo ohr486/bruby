@@ -53,7 +53,7 @@ TEST_RUBY_TARGETS = $(addprefix $(TEST_RUBY_EBIN)/, $(addsuffix .beam, $(basenam
 
 test_ruby: compile_ruby $(TEST_RUBY_TARGETS)
 	$(Q) echo ===== run ruby tests
-	$(Q) $(ERL) -pa lib/ruby/ebin -pa $(TEST_RUBY_EBIN) -s test_helper test
+	$(Q) $(ERL) -noshell -pa lib/ruby/ebin -pa $(TEST_RUBY_EBIN) -s test_helper test
 
 $(TEST_RUBY_EBIN)/%.beam: $(TEST_RUBY_ERL_DIR)/%.erl
 	$(Q) mkdir -p $(TEST_RUBY_EBIN)

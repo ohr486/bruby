@@ -124,16 +124,16 @@ test_strings() ->
 
 test_operators() ->
   {ok, Tokens1, _} = ruby_tokenizer:tokenize("+"),
-  assert_equal([{$+, 1}], Tokens1, "operator: +"),
+  assert_equal([{'+', 1}], Tokens1, "operator: +"),
 
   {ok, Tokens2, _} = ruby_tokenizer:tokenize("-"),
-  assert_equal([{$-, 1}], Tokens2, "operator: -"),
+  assert_equal([{'-', 1}], Tokens2, "operator: -"),
 
   {ok, Tokens3, _} = ruby_tokenizer:tokenize("*"),
-  assert_equal([{$*, 1}], Tokens3, "operator: *"),
+  assert_equal([{'*', 1}], Tokens3, "operator: *"),
 
   {ok, Tokens4, _} = ruby_tokenizer:tokenize("/"),
-  assert_equal([{$/, 1}], Tokens4, "operator: /"),
+  assert_equal([{'/', 1}], Tokens4, "operator: /"),
 
   {ok, Tokens5, _} = ruby_tokenizer:tokenize("=="),
   assert_equal([{tEQ, 1}], Tokens5, "operator: =="),
@@ -156,25 +156,25 @@ test_operators() ->
 
 test_delimiters() ->
   {ok, Tokens1, _} = ruby_tokenizer:tokenize("()"),
-  assert_equal([{$(, 1}, {$), 1}], Tokens1, "parentheses"),
+  assert_equal([{'(', 1}, {')', 1}], Tokens1, "parentheses"),
 
   {ok, Tokens2, _} = ruby_tokenizer:tokenize("[]"),
-  assert_equal([{$[, 1}, {$], 1}], Tokens2, "brackets"),
+  assert_equal([{'[', 1}, {']', 1}], Tokens2, "brackets"),
 
   {ok, Tokens3, _} = ruby_tokenizer:tokenize("{}"),
-  assert_equal([{${, 1}, {$}, 1}], Tokens3, "braces"),
+  assert_equal([{'{', 1}, {'}', 1}], Tokens3, "braces"),
 
   {ok, Tokens4, _} = ruby_tokenizer:tokenize(","),
-  assert_equal([{$,, 1}], Tokens4, "comma"),
+  assert_equal([{',', 1}], Tokens4, "comma"),
 
   {ok, Tokens5, _} = ruby_tokenizer:tokenize("."),
-  assert_equal([{$., 1}], Tokens5, "dot"),
+  assert_equal([{'.', 1}], Tokens5, "dot"),
 
   {ok, Tokens6, _} = ruby_tokenizer:tokenize(":"),
-  assert_equal([{$:, 1}], Tokens6, "colon"),
+  assert_equal([{':', 1}], Tokens6, "colon"),
 
   {ok, Tokens7, _} = ruby_tokenizer:tokenize(";"),
-  assert_equal([{$;, 1}], Tokens7, "semicolon"),
+  assert_equal([{';', 1}], Tokens7, "semicolon"),
   ok.
 
 test_complex_expression() ->
@@ -183,13 +183,13 @@ test_complex_expression() ->
   Expected = [
     {tDEF, 1},
     {tIDENTIFIER, 1, "foo"},
-    {$(, 1},
+    {'(', 1},
     {tIDENTIFIER, 1, "x"},
-    {$,, 1},
+    {',', 1},
     {tIDENTIFIER, 1, "y"},
-    {$), 1},
+    {')', 1},
     {tIDENTIFIER, 2, "x"},
-    {$+, 2},
+    {'+', 2},
     {tIDENTIFIER, 2, "y"},
     {tEND, 3}
   ],
