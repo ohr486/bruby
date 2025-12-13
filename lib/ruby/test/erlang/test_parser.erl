@@ -8,10 +8,14 @@ test() ->
   test_literals(),
   test_identifiers(),
   test_binary_operations(),
+  test_bitwise_operations(),
   test_method_calls(),
   test_assignments(),
   test_method_definitions(),
+  test_class_definitions(),
   test_if_statements(),
+  test_while_statements(),
+  test_until_statements(),
   test_complex_expressions(),
 
   io:format("~n=== All Parser Tests Passed ===~n"),
@@ -116,6 +120,15 @@ test_binary_operations() ->
     [{binary_op, 1, '>', {identifier, 1, "x"}, {integer, 1, 5}}],
     "greater than"),
 
+  % 論理演算
+  assert_parse("x and y",
+    [{binary_op, 1, 'and', {identifier, 1, "x"}, {identifier, 1, "y"}}],
+    "logical and"),
+
+  assert_parse("x or y",
+    [{binary_op, 1, 'or', {identifier, 1, "x"}, {identifier, 1, "y"}}],
+    "logical or"),
+
   % 複雑な式
   assert_parse("1 + 2 * 3",
     [{binary_op, 1, '+',
@@ -128,6 +141,40 @@ test_binary_operations() ->
       {binary_op, 1, '+', {integer, 1, 1}, {integer, 1, 2}},
       {integer, 1, 3}}],
     "parentheses grouping"),
+  ok.
+
+test_bitwise_operations() ->
+  % ビット演算
+  assert_parse("x & y",
+    [{binary_op, 1, '&', {identifier, 1, "x"}, {identifier, 1, "y"}}],
+    "bitwise and"),
+
+  assert_parse("x | y",
+    [{binary_op, 1, '|', {identifier, 1, "x"}, {identifier, 1, "y"}}],
+    "bitwise or"),
+
+  assert_parse("x ^ y",
+    [{binary_op, 1, '^', {identifier, 1, "x"}, {identifier, 1, "y"}}],
+    "bitwise xor"),
+
+  assert_parse("~x",
+    [{unary_op, 1, '~', {identifier, 1, "x"}}],
+    "bitwise not"),
+
+  assert_parse("x << 2",
+    [{binary_op, 1, '<<', {identifier, 1, "x"}, {integer, 1, 2}}],
+    "left shift"),
+
+  assert_parse("x >> 2",
+    [{binary_op, 1, '>>', {identifier, 1, "x"}, {integer, 1, 2}}],
+    "right shift"),
+
+  % 複雑な式
+  assert_parse("1 & 2 | 3",
+    [{binary_op, 1, '|',
+      {binary_op, 1, '&', {integer, 1, 1}, {integer, 1, 2}},
+      {integer, 1, 3}}],
+    "bitwise precedence"),
   ok.
 
 test_method_calls() ->
@@ -172,6 +219,21 @@ test_method_definitions() ->
   assert_parse_ok("def greet(name)\n  \"Hello\"\nend", "method def one param"),
   ok.
 
+test_class_definitions() ->
+  % 空のクラス定義
+  assert_parse("class Foo\nend",
+    [{class_def, 1, "Foo", []}],
+    "empty class definition"),
+
+  % メソッドを持つクラス
+  assert_parse_ok("class Bar\n  def hello\n    42\n  end\nend",
+    "class with method"),
+
+  % 複数のメソッドを持つクラス
+  assert_parse_ok("class Baz\n  def foo\n    1\n  end; def bar\n    2\n  end\nend",
+    "class with multiple methods"),
+  ok.
+
 test_if_statements() ->
   % 単純なif
   assert_parse_ok("if true\n  42\nend", "simple if"),
@@ -181,6 +243,36 @@ test_if_statements() ->
 
   % if-elsif-else
   assert_parse_ok("if x == 1\n  1\nelsif x == 2\n  2\nelse\n  3\nend", "if-elsif-else"),
+  ok.
+
+test_while_statements() ->
+  % 空のwhileループ
+  assert_parse("while true\nend",
+    [{while_stmt, 1, {boolean, 1, true}, []}],
+    "empty while loop"),
+
+  % 本体を持つwhileループ
+  assert_parse_ok("while x < 10\n  x = x + 1\nend",
+    "while loop with body"),
+
+  % 複雑な条件のwhileループ
+  assert_parse_ok("while x > 0 and y < 100\n  x = x - 1; y = y + 1\nend",
+    "while loop with complex condition"),
+  ok.
+
+test_until_statements() ->
+  % 空のuntilループ
+  assert_parse("until false\nend",
+    [{until_stmt, 1, {boolean, 1, false}, []}],
+    "empty until loop"),
+
+  % 本体を持つuntilループ
+  assert_parse_ok("until x >= 10\n  x = x + 1\nend",
+    "until loop with body"),
+
+  % 複雑な条件のuntilループ
+  assert_parse_ok("until x == 0 or y > 100\n  x = x - 1; y = y + 1\nend",
+    "until loop with complex condition"),
   ok.
 
 test_complex_expressions() ->

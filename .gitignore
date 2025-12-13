@@ -10,5 +10,6 @@
 
 
 /lib/ruby/src/*_parser.erl
+/lib/ruby/src/*.yrl
 /lib/*/ebin
 erl_crash.dump

@@ -132,6 +132,14 @@ tokenize([$: | Rest], Line, Column, Scope, Tokens) ->
   tokenize(Rest, Line, Column + 1, Scope, [{':', Line} | Tokens]);
 tokenize([$; | Rest], Line, Column, Scope, Tokens) ->
   tokenize(Rest, Line, Column + 1, Scope, [{';', Line} | Tokens]);
+tokenize([$& | Rest], Line, Column, Scope, Tokens) ->
+  tokenize(Rest, Line, Column + 1, Scope, [{'&', Line} | Tokens]);
+tokenize([$| | Rest], Line, Column, Scope, Tokens) ->
+  tokenize(Rest, Line, Column + 1, Scope, [{'|', Line} | Tokens]);
+tokenize([$^ | Rest], Line, Column, Scope, Tokens) ->
+  tokenize(Rest, Line, Column + 1, Scope, [{'^', Line} | Tokens]);
+tokenize([$~ | Rest], Line, Column, Scope, Tokens) ->
+  tokenize(Rest, Line, Column + 1, Scope, [{'~', Line} | Tokens]);
 
 %% 未知の文字
 tokenize([C | Rest], Line, Column, Scope, Tokens) ->
