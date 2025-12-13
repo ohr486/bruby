@@ -152,6 +152,7 @@ tokenize([C | Rest], Line, Column, Scope, Tokens) ->
 %% ========================================
 
 %% @doc コメントをスキップ（行末まで）
+-spec skip_comment(string(), pos_integer()) -> {[], string(), pos_integer()}.
 skip_comment([], Line) ->
   {[], [], Line};
 skip_comment([$\n | Rest], Line) ->
@@ -164,6 +165,7 @@ skip_comment([_ | Rest], Line) ->
   skip_comment(Rest, Line).
 
 %% @doc 識別子をスキャン
+-spec scan_identifier(string(), string()) -> {string(), string()}.
 scan_identifier([], Acc) ->
   {lists:reverse(Acc), []};
 scan_identifier([C | Rest], Acc)
@@ -176,6 +178,7 @@ scan_identifier(String, Acc) ->
   {lists:reverse(Acc), String}.
 
 %% @doc 数値をスキャン（整数のみ）
+-spec scan_number(string(), string()) -> {string(), string()}.
 scan_number([], Acc) ->
   {lists:reverse(Acc), []};
 scan_number([C | Rest], Acc) when C >= $0 andalso C =< $9 ->
@@ -184,6 +187,7 @@ scan_number(String, Acc) ->
   {lists:reverse(Acc), String}.
 
 %% @doc 文字列をスキャン
+-spec scan_string(string(), string(), char()) -> {ok, string(), string()} | {error, atom()}.
 scan_string([], _Acc, _Quote) ->
   {error, unterminated_string};
 scan_string([Quote | Rest], Acc, Quote) ->
@@ -204,6 +208,7 @@ scan_string([C | Rest], Acc, Quote) ->
   scan_string(Rest, [C | Acc], Quote).
 
 %% @doc 識別子がキーワードかどうかを判定
+-spec identifier_or_keyword(string(), pos_integer()) -> {atom(), pos_integer()} | {atom(), pos_integer(), string()}.
 identifier_or_keyword("def", Line) -> {tDEF, Line};
 identifier_or_keyword("end", Line) -> {tEND, Line};
 identifier_or_keyword("class", Line) -> {tCLASS, Line};
