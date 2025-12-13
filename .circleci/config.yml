@@ -11,6 +11,7 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Build
           command: make ci
       - slack/notify:
           event: always
