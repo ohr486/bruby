@@ -29,7 +29,7 @@ RUBY_PARSER := lib/ruby/src/ruby_parser.erl
 
 $(RUBY_PARSER): lib/ruby/src/ruby_parser.yrl
 	$(Q) echo ===== build ruby parser
-	$(Q) $(ERLC) -o $@ $<
+	$(Q) $(ERLC) -o lib/ruby/src $<
 
 # ---------- BUILD RUBY ----------
 
