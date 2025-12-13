@@ -54,8 +54,17 @@ eval_string(Code, Env) when is_map(Env) ->
 %% 評価環境の型定義
 -type env() :: #{
     bindings := #{atom() => term()},    % ローカル変数の束縛
+    methods := #{atom() => method()},    % メソッド定義
     parent := env() | nil,               % 親スコープ
     return_value := term() | undefined   % return文の値
+}.
+
+%% メソッドの型定義
+-type method() :: #{
+    name := atom(),
+    params := list(),
+    body := list(),
+    closure_env := env()  % メソッド定義時の環境（クロージャ）
 }.
 
 %% @doc 新しい環境を作成
@@ -63,6 +72,7 @@ eval_string(Code, Env) when is_map(Env) ->
 new_env() ->
     #{
         bindings => #{},
+        methods => #{},
         parent => nil,
         return_value => undefined
     }.
@@ -72,6 +82,7 @@ new_env() ->
 new_env(ParentEnv) when is_map(ParentEnv) ->
     #{
         bindings => #{},
+        methods => #{},
         parent => ParentEnv,
         return_value => undefined
     }.
@@ -97,6 +108,36 @@ lookup_var(Name, Env) when is_atom(Name), is_map(Env) ->
                     {error, undefined};
                 ParentEnv ->
                     lookup_var(Name, ParentEnv)
+            end
+    end.
+
+%% @doc メソッドを環境に登録
+-spec define_method(atom(), list(), list(), env()) -> env().
+define_method(Name, Params, Body, Env) when is_atom(Name), is_map(Env) ->
+    Methods = maps:get(methods, Env),
+    Method = #{
+        name => Name,
+        params => Params,
+        body => Body,
+        closure_env => Env
+    },
+    NewMethods = maps:put(Name, Method, Methods),
+    maps:put(methods, NewMethods, Env).
+
+%% @doc メソッドを環境から検索
+-spec lookup_method(atom(), env()) -> {ok, method()} | {error, undefined}.
+lookup_method(Name, Env) when is_atom(Name), is_map(Env) ->
+    Methods = maps:get(methods, Env),
+    case maps:find(Name, Methods) of
+        {ok, Method} ->
+            {ok, Method};
+        error ->
+            % 親スコープを検索
+            case maps:get(parent, Env) of
+                nil ->
+                    {error, undefined};
+                ParentEnv ->
+                    lookup_method(Name, ParentEnv)
             end
     end.
 
@@ -153,13 +194,28 @@ eval_node({unary_op, Line, Op, Expr}, Env) ->
     Result = eval_unary_op(Op, Val, Line),
     {Result, Env1};
 
-%% メソッド呼び出し（未実装）
-eval_node({call, Line, _Name, _Args}, _Env) ->
-    throw({ruby_error, {not_implemented, Line, method_call}});
+%% メソッド呼び出し
+eval_node({call, Line, Name, Args}, Env) ->
+    NameAtom = ensure_atom(Name),
+    case lookup_method(NameAtom, Env) of
+        {ok, Method} ->
+            % 引数を評価
+            {ArgValues, Env1} = eval_args(Args, Env, []),
+            % メソッドを呼び出し
+            call_method(Method, ArgValues, Env1, Line);
+        {error, undefined} ->
+            throw({ruby_error, {undefined_method, Line, Name}})
+    end;
 
-%% メソッド定義（未実装）
-eval_node({method_def, Line, _Name, _Params, _Body}, _Env) ->
-    throw({ruby_error, {not_implemented, Line, method_def}});
+%% メソッド定義
+eval_node({method_def, _Line, Name, Params, Body}, Env) ->
+    NameAtom = ensure_atom(Name),
+    % パラメータ名のリストを抽出
+    ParamNames = extract_param_names(Params),
+    % メソッドを環境に登録
+    NewEnv = define_method(NameAtom, ParamNames, Body, Env),
+    % メソッド定義はシンボル（アトム）を返す
+    {NameAtom, NewEnv};
 
 %% クラス定義（未実装）
 eval_node({class_def, Line, _Name, _Body}, _Env) ->
@@ -345,3 +401,63 @@ ensure_atom(Name) when is_list(Name) ->
     list_to_atom(Name);
 ensure_atom(Name) when is_binary(Name) ->
     binary_to_atom(Name, utf8).
+
+%% @doc パラメータリストからパラメータ名のリストを抽出
+-spec extract_param_names(list()) -> list(atom()).
+extract_param_names([]) ->
+    [];
+extract_param_names([{param, _Line, Name} | Rest]) ->
+    NameAtom = ensure_atom(Name),
+    [NameAtom | extract_param_names(Rest)].
+
+%% @doc 引数リストを順次評価
+-spec eval_args(list(), env(), list()) -> {list(), env()}.
+eval_args([], Env, AccValues) ->
+    {lists:reverse(AccValues), Env};
+eval_args([Arg | Rest], Env, AccValues) ->
+    {Value, Env1} = eval_node(Arg, Env),
+    eval_args(Rest, Env1, [Value | AccValues]).
+
+%% @doc メソッドを呼び出す
+-spec call_method(method(), list(), env(), integer()) -> {term(), env()}.
+call_method(Method, ArgValues, CallerEnv, Line) ->
+    #{
+        params := ParamNames,
+        body := Body,
+        closure_env := ClosureEnv
+    } = Method,
+
+    % 引数の数をチェック
+    ParamCount = length(ParamNames),
+    ArgCount = length(ArgValues),
+    if
+        ParamCount =/= ArgCount ->
+            throw({ruby_error, {wrong_number_of_arguments, Line, ParamCount, ArgCount}});
+        true ->
+            ok
+    end,
+
+    % メソッド実行用の新しい環境を作成（クロージャ環境を親とする）
+    MethodEnv = new_env(ClosureEnv),
+
+    % パラメータと引数を束縛
+    MethodEnv1 = bind_params(ParamNames, ArgValues, MethodEnv),
+
+    % メソッド本体を評価
+    {Result, MethodEnv2} = eval_stmts(Body, MethodEnv1, nil),
+
+    % return文が実行されていた場合はその値を返す
+    case maps:get(return_value, MethodEnv2) of
+        undefined ->
+            {Result, CallerEnv};
+        ReturnValue ->
+            {ReturnValue, CallerEnv}
+    end.
+
+%% @doc パラメータと引数を束縛
+-spec bind_params(list(atom()), list(), env()) -> env().
+bind_params([], [], Env) ->
+    Env;
+bind_params([ParamName | RestParams], [ArgValue | RestArgs], Env) ->
+    Env1 = bind_var(ParamName, ArgValue, Env),
+    bind_params(RestParams, RestArgs, Env1).
