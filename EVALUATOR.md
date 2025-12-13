@@ -209,6 +209,42 @@ ruby_evaluator:eval_string("def calc(a, b) a * 2 + b * 3 end; x = 5; y = 10; cal
 % {ok, 40, ...}
 ```
 
+### 11. クラス定義
+
+```erlang
+% 空のクラス定義
+ruby_evaluator:eval_string("class MyClass
+end").
+% {ok, 'MyClass', ...}
+
+% メソッドを含むクラス定義
+ruby_evaluator:eval_string("class Calculator
+  def add(x, y)
+    x + y
+  end
+  def multiply(x, y)
+    x * y
+  end
+end").
+% {ok, 'Calculator', ...}
+
+% クラス内でローカル変数を使うメソッド
+ruby_evaluator:eval_string("class Counter
+  def increment(n)
+    result = n + 1
+    result
+  end
+end").
+% {ok, 'Counter', ...}
+
+% 複数のクラス定義
+ruby_evaluator:eval_string("class ClassA
+end
+class ClassB
+end").
+% {ok, 'ClassB', ...}
+```
+
 ## 環境を引き継いだ評価
 
 eval_string/2を使用すると、前の評価結果の環境を引き継げます：
@@ -225,9 +261,18 @@ eval_string/2を使用すると、前の評価結果の環境を引き継げま�
 % Result3 は 10 になる（メソッド定義が引き継がれている）
 
 % 変数とメソッドの両方を引き継ぐ
-{ok, _, Env4} = ruby_evaluator:eval_string("def add(a, b) a + b end; x = 10", new_env()).
+{ok, _, Env4} = ruby_evaluator:eval_string("def add(a, b) a + b end; x = 10").
 {ok, Result4, _} = ruby_evaluator:eval_string("y = 20; add(x, y)", Env4).
 % Result4 は 30 になる
+
+% クラスの引き継ぎ
+{ok, _, Env5} = ruby_evaluator:eval_string("class Calculator
+  def add(x, y)
+    x + y
+  end
+end").
+{ok, Result5, _} = ruby_evaluator:eval_string("x = 10", Env5).
+% クラス定義が引き継がれている
 ```
 
 ## 現在サポートしている機能
@@ -243,14 +288,14 @@ eval_string/2を使用すると、前の評価結果の環境を引き継げま�
 - ✅ return文
 - ✅ メソッド定義（def...end）
 - ✅ メソッド呼び出し（引数の評価、メソッドディスパッチ）
+- ✅ クラス定義（class...end）
 
 ## 未実装の機能
 
 以下の機能は現在未実装です：
 
-- ❌ クラス定義と継承
+- ❌ クラスの継承とインスタンス化（new、インスタンス変数、インスタンスメソッド呼び出し）
 - ❌ レシーバー付きメソッド呼び出し（obj.method）
-- ❌ 再帰的なメソッド呼び出し
 - ❌ ブロック/イテレータ
 - ❌ シンボル
 - ❌ 配列・ハッシュ

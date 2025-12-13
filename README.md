@@ -71,6 +71,7 @@ ruby_evaluator:eval_string("def add(x, y) x + y end; add(3, 4)"). % メソッド
 - ✅ リテラル、変数、演算子（算術、比較、論理、ビット）
 - ✅ 制御フロー（if/elsif/else、while/until、return）
 - ✅ メソッド定義と呼び出し
+- ✅ クラス定義
 
 詳細なサンプルコードと使い方は [EVALUATOR.md](EVALUATOR.md) を参照してください。
 

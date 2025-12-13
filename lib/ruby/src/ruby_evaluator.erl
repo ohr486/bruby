@@ -1,6 +1,9 @@
 -module(ruby_evaluator).
 -export([eval/1, eval/2, eval_string/1, eval_string/2, new_env/0, new_env/1]).
 
+%% 将来のクラスインスタンス化で使用予定のため警告を抑制
+-compile({nowarn_unused_function, [{lookup_class, 2}]}).
+
 %% ============================================================================
 %% 公開API
 %% ============================================================================
@@ -55,6 +58,7 @@ eval_string(Code, Env) when is_map(Env) ->
 -type env() :: #{
     bindings := #{atom() => term()},    % ローカル変数の束縛
     methods := #{atom() => method()},    % メソッド定義
+    classes := #{atom() => class()},     % クラス定義
     parent := env() | nil,               % 親スコープ
     return_value := term() | undefined   % return文の値
 }.
@@ -67,12 +71,21 @@ eval_string(Code, Env) when is_map(Env) ->
     closure_env := env()  % メソッド定義時の環境（クロージャ）
 }.
 
+%% クラスの型定義
+-type class() :: #{
+    name := atom(),
+    superclass := atom() | nil,          % 親クラス
+    methods := #{atom() => method()},    % クラスのメソッド
+    instance_vars := list(atom())        % インスタンス変数のリスト（将来の拡張用）
+}.
+
 %% @doc 新しい環境を作成
 -spec new_env() -> env().
 new_env() ->
     #{
         bindings => #{},
         methods => #{},
+        classes => #{},
         parent => nil,
         return_value => undefined
     }.
@@ -83,6 +96,7 @@ new_env(ParentEnv) when is_map(ParentEnv) ->
     #{
         bindings => #{},
         methods => #{},
+        classes => #{},
         parent => ParentEnv,
         return_value => undefined
     }.
@@ -138,6 +152,36 @@ lookup_method(Name, Env) when is_atom(Name), is_map(Env) ->
                     {error, undefined};
                 ParentEnv ->
                     lookup_method(Name, ParentEnv)
+            end
+    end.
+
+%% @doc クラスを環境に登録
+-spec define_class(atom(), atom() | nil, #{atom() => method()}, env()) -> env().
+define_class(Name, Superclass, Methods, Env) when is_atom(Name), is_map(Env) ->
+    Classes = maps:get(classes, Env),
+    Class = #{
+        name => Name,
+        superclass => Superclass,
+        methods => Methods,
+        instance_vars => []
+    },
+    NewClasses = maps:put(Name, Class, Classes),
+    maps:put(classes, NewClasses, Env).
+
+%% @doc クラスを環境から検索
+-spec lookup_class(atom(), env()) -> {ok, class()} | {error, undefined}.
+lookup_class(Name, Env) when is_atom(Name), is_map(Env) ->
+    Classes = maps:get(classes, Env),
+    case maps:find(Name, Classes) of
+        {ok, Class} ->
+            {ok, Class};
+        error ->
+            % 親スコープを検索
+            case maps:get(parent, Env) of
+                nil ->
+                    {error, undefined};
+                ParentEnv ->
+                    lookup_class(Name, ParentEnv)
             end
     end.
 
@@ -217,9 +261,19 @@ eval_node({method_def, _Line, Name, Params, Body}, Env) ->
     % メソッド定義はシンボル（アトム）を返す
     {NameAtom, NewEnv};
 
-%% クラス定義（未実装）
-eval_node({class_def, Line, _Name, _Body}, _Env) ->
-    throw({ruby_error, {not_implemented, Line, class_def}});
+%% クラス定義
+eval_node({class_def, _Line, Name, Body}, Env) ->
+    NameAtom = ensure_atom(Name),
+    % クラススコープ用の新しい環境を作成（親環境を引き継ぐ）
+    ClassEnv = new_env(Env),
+    % クラス本体を評価してメソッドを収集
+    {_LastValue, ClassEnv1} = eval_stmts(Body, ClassEnv, nil),
+    % クラス本体で定義されたメソッドを取得
+    ClassMethods = maps:get(methods, ClassEnv1),
+    % クラスを環境に登録（継承なし: superclass = nil）
+    NewEnv = define_class(NameAtom, nil, ClassMethods, Env),
+    % クラス定義はシンボル（アトム）を返す
+    {NameAtom, NewEnv};
 
 %% if文
 eval_node({if_stmt, _Line, Condition, ThenBody, ElsifClauses, ElseClause}, Env) ->

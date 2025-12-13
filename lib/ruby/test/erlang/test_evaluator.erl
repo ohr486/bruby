@@ -15,6 +15,7 @@ test() ->
   test_while_statements(),
   test_until_statements(),
   test_method_operations(),
+  test_class_operations(),
 
   io:format("~n=== All Evaluator Tests Passed ===~n"),
   ok.
@@ -397,5 +398,46 @@ test_method_operations() ->
     {call, 3, "add", [{integer, 3, 3}]}
   ],
   assert_eval_error(AST8, "wrong number of arguments error"),
+
+  ok.
+
+test_class_operations() ->
+  % 空のクラス定義
+  AST1 = [{class_def, 1, "EmptyClass", []}],
+  assert_eval(AST1, 'EmptyClass', "empty class definition"),
+
+  % クラス定義はクラス名（シンボル）を返す
+  AST2 = [{class_def, 1, "MyClass", []}],
+  assert_eval(AST2, 'MyClass', "class definition returns class name"),
+
+  % メソッドを含むクラス定義
+  AST3 = [
+    {class_def, 1, "Calculator", [
+      {method_def, 2, "add", [{param, 2, "x"}, {param, 2, "y"}],
+       [{binary_op, 3, '+', {identifier, 3, "x"}, {identifier, 3, "y"}}]},
+      {method_def, 4, "multiply", [{param, 4, "x"}, {param, 4, "y"}],
+       [{binary_op, 5, '*', {identifier, 5, "x"}, {identifier, 5, "y"}}]}
+    ]}
+  ],
+  assert_eval(AST3, 'Calculator', "class with methods"),
+
+  % クラス内で変数を使うメソッド定義
+  AST4 = [
+    {class_def, 1, "Counter", [
+      {method_def, 2, "increment", [{param, 2, "n"}],
+       [
+         {assign, 3, {var, 3, "result"}, {binary_op, 3, '+', {identifier, 3, "n"}, {integer, 3, 1}}},
+         {identifier, 4, "result"}
+       ]}
+    ]}
+  ],
+  assert_eval(AST4, 'Counter', "class with method using local variables"),
+
+  % 複数のクラス定義
+  AST5 = [
+    {class_def, 1, "ClassA", []},
+    {class_def, 2, "ClassB", []}
+  ],
+  assert_eval(AST5, 'ClassB', "multiple class definitions"),
 
   ok.
