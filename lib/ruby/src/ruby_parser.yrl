@@ -5,13 +5,17 @@ Nonterminals
   call_args arg_list
   method_def method_params param_list
   if_stmt elsif_clauses elsif_clause else_clause
+  class_def class_body
+  while_stmt
+  until_stmt
   .
 
 Terminals
   tIDENTIFIER tINTEGER tSTRING
   tTRUE tFALSE tNIL
-  tDEF tEND
+  tDEF tEND tCLASS
   tIF tELSIF tELSE
+  tWHILE tUNTIL
   tRETURN tBREAK tNEXT
   tAND tOR
   tEQ tNE tLE tGE
@@ -30,10 +34,12 @@ Left 200 tOR.
 Left 300 tAND.
 Nonassoc 400 tEQ tNE.
 Nonassoc 500 '<' '>' tLE tGE.
-Left 600 '+' '-'.
-Left 700 '*' '/' '%'.
+Left 600 '|' '^'.
+Left 700 '&'.
 Left 800 tLSHIFT tRSHIFT.
-Left 900 '&' '|' '^' '~'.
+Left 900 '+' '-'.
+Left 1000 '*' '/' '%'.
+Right 1100 '~'.
 
 %% プログラム全体
 program -> stmts : '$1'.
@@ -48,7 +54,10 @@ stmts -> stmt ';' : ['$1'].
 stmt -> expr : '$1'.
 stmt -> var_lhs '=' expr : {assign, line_of('$2'), '$1', '$3'}.
 stmt -> method_def : '$1'.
+stmt -> class_def : '$1'.
 stmt -> if_stmt : '$1'.
+stmt -> while_stmt : '$1'.
+stmt -> until_stmt : '$1'.
 stmt -> tRETURN : {return, line_of('$1'), nil}.
 stmt -> tRETURN expr : {return, line_of('$1'), '$2'}.
 stmt -> tBREAK : {break, line_of('$1')}.
@@ -126,6 +135,26 @@ elsif_clauses -> elsif_clause elsif_clauses : ['$1' | '$2'].
 elsif_clause -> tELSIF expr stmts : {elsif, line_of('$1'), '$2', '$3'}.
 
 else_clause -> tELSE stmts : {else_clause, line_of('$1'), '$2'}.
+
+%% クラス定義
+class_def -> tCLASS tIDENTIFIER class_body tEND :
+  {class_def, line_of('$1'), value_of('$2'), '$3'}.
+class_def -> tCLASS tIDENTIFIER tEND :
+  {class_def, line_of('$1'), value_of('$2'), []}.
+
+class_body -> stmts : '$1'.
+
+%% while文
+while_stmt -> tWHILE expr stmts tEND :
+  {while_stmt, line_of('$1'), '$2', '$3'}.
+while_stmt -> tWHILE expr tEND :
+  {while_stmt, line_of('$1'), '$2', []}.
+
+%% until文
+until_stmt -> tUNTIL expr stmts tEND :
+  {until_stmt, line_of('$1'), '$2', '$3'}.
+until_stmt -> tUNTIL expr tEND :
+  {until_stmt, line_of('$1'), '$2', []}.
 
 Erlang code.
 
