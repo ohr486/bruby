@@ -9,6 +9,8 @@
   warn_deprecated_function,
   warn_obsolete_guard,
   warn_exported_vars,
+  warn_missing_spec,
+  warn_untyped_record,
   debug_info,
   {outdir, "ebin/"}
 ]}.

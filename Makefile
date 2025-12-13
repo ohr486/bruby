@@ -5,10 +5,11 @@ Q := @
 ERL := erl
 ERLC := erlc
 EMAKE := erl -make
+DIALYZER := dialyzer
 
 # ---------- COMMON ----------
 
-.PHONY: compile clean test erlang
+.PHONY: compile clean test erlang lint dialyzer plt
 .PHONY: compile_ruby test_ruby setup_ruby_dirs erlang_for_ruby
 .PHONY: compile_irb test_irb setup_irb_dirs erlang_for_irb
 .PHONY: compile_epmd test_epmd setup_epmd_dirs erlang_for_epmd
@@ -17,7 +18,7 @@ default: compile
 
 compile: compile_ruby compile_irb compile_epmd
 test: test_ruby test_irb test_epmd
-ci: compile test
+ci: compile test lint
 
 
 # ---------- PRE BUILD RUBY ----------
@@ -138,5 +139,52 @@ clean:
 	rm -rf lib/*/ebin/
 	rm -rf lib/*/test/ebin/
 	rm -f erl_crash.dump
+	rm -f bin/erl_crash.dump
 	rm -rf $(RUBY_PARSER)
 	rm -rf lib/**/*.beam
+	rm -f .bruby_plt
+
+
+# ---------- LINT ----------
+
+PLT_FILE := .bruby_plt
+
+plt:
+	$(Q) echo ===== creating PLT file for dialyzer
+	$(Q) $(DIALYZER) --build_plt --output_plt $(PLT_FILE) \
+		--apps kernel stdlib compiler erts || true
+
+dialyzer: compile
+	$(Q) echo ===== running dialyzer
+	$(Q) if [ ! -f $(PLT_FILE) ]; then \
+		echo "PLT file not found. Creating..."; \
+		$(MAKE) plt; \
+	fi
+	$(Q) $(DIALYZER) --plt $(PLT_FILE) \
+		-r lib/ruby/ebin lib/irb/ebin lib/epmd/ebin \
+		--no_check_plt
+
+LINT_OPTS := -W \
+	+warn_unused_vars \
+	+warn_export_all \
+	+warn_shadow_vars \
+	+warn_unused_import \
+	+warn_unused_function \
+	+warn_bif_clash \
+	+warn_unused_record \
+	+warn_deprecated_function \
+	+warn_obsolete_guard \
+	+warn_exported_vars \
+	+warn_missing_spec \
+	+warn_untyped_record \
+	+debug_info
+
+lint: compile
+	$(Q) echo ===== running lint checks
+	$(Q) echo "Checking ruby application..."
+	$(ERLC) $(LINT_OPTS) -I lib/ruby/src -o /tmp lib/ruby/src/*.erl || true
+	$(Q) echo "Checking irb application..."
+	$(ERLC) $(LINT_OPTS) -I lib/irb/src -o /tmp lib/irb/src/*.erl || true
+	$(Q) echo "Checking epmd application..."
+	$(ERLC) $(LINT_OPTS) -I lib/epmd/src -o /tmp lib/epmd/src/*.erl || true
+	$(Q) echo ===== lint complete
