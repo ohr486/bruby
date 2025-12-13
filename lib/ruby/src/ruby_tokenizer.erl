@@ -3,16 +3,19 @@
 -export([tokenize/1, tokenize/3, tokenize/4]).
 
 %% @doc トークナイズのエントリーポイント（文字列のみ）
+-spec tokenize(string() | binary()) -> {ok, list(), pos_integer()} | {error, tuple(), pos_integer()}.
 tokenize(String) when is_list(String) ->
   tokenize(String, 1, #ruby_tokenizer{});
 tokenize(String) when is_binary(String) ->
   tokenize(binary_to_list(String), 1, #ruby_tokenizer{}).
 
 %% @doc トークナイズのエントリーポイント（行番号と状態指定）
+-spec tokenize(string(), pos_integer(), #ruby_tokenizer{}) -> {ok, list(), pos_integer()} | {error, tuple(), pos_integer()}.
 tokenize(String, Line, Opts) ->
   tokenize(String, Line, 1, Opts).
 
 %% @doc トークナイズのメイン処理
+-spec tokenize(string(), pos_integer(), pos_integer(), #ruby_tokenizer{}) -> {ok, list(), pos_integer()} | {error, tuple(), pos_integer()}.
 tokenize(String, Line, Column, #ruby_tokenizer{} = Scope) ->
   tokenize(String, Line, Column, Scope, []).
 

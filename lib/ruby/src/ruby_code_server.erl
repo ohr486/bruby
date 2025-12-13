@@ -6,8 +6,8 @@
 
 %% Ruby code server state record
 -record(ruby_code_server, {
-  class_pool = {[], [], 0},  % Class pool: {Available, Allocated, Size}
-  class_ets = #{}            % Map of monitor references to class names
+  class_pool = {[], [], 0} :: {list(), list(), non_neg_integer()},  % Class pool: {Available, Allocated, Size}
+  class_ets = #{} :: map()                                          % Map of monitor references to class names
 }).
 
 -type state() :: #ruby_code_server{}.

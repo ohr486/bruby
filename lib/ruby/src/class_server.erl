@@ -6,8 +6,8 @@
 
 %% Class pool state record
 -record(class_server, {
-  class_pool = {[], [], 0},  % Class pool: {Available, Allocated, Size}
-  class_ets = #{}            % ETS table mapping
+  class_pool = {[], [], 0} :: {list(), list(), non_neg_integer()},  % Class pool: {Available, Allocated, Size}
+  class_ets = #{} :: map()                                          % ETS table mapping
 }).
 
 -type state() :: #class_server{}.
