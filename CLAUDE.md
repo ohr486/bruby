@@ -27,6 +27,15 @@ make ci
 
 # すべての生成ファイルをクリーン
 make clean
+
+# Lintチェックを実行（コンパイラ警告）
+make lint
+
+# Dialyzer（型チェッカー）を実行
+make dialyzer
+
+# Dialyzer用のPLTファイルを作成
+make plt
 ```
 
 ### コンポーネント別コマンド
@@ -111,9 +120,32 @@ CircleCIがすべてのコミットでErlang 27 Dockerイメージを使用し�
 - `make ci` (compile + test) を実行
 - Slack通知がorb経由で設定済み
 
+## Lint & 静的解析
+
+プロジェクトには2つのlintツールが用意されています：
+
+### コンパイラ警告 (`make lint`)
+以下の警告を有効化しています（Emakefileで設定）：
+- `warn_unused_vars`: 未使用変数
+- `warn_export_all`: export_allの使用
+- `warn_shadow_vars`: シャドウ変数
+- `warn_unused_import`: 未使用インポート
+- `warn_unused_function`: 未使用関数
+- `warn_bif_clash`: BIF衝突
+- `warn_unused_record`: 未使用レコード
+- `warn_deprecated_function`: 非推奨関数
+- `warn_obsolete_guard`: 廃止されたガード
+- `warn_exported_vars`: エクスポートされた変数
+- `warn_missing_spec`: 型仕様の欠如
+- `warn_untyped_record`: 型なしレコード
+
+### Dialyzer (`make dialyzer`)
+Dialyzerは型の不整合とエラーを検出します。初回実行時にPLTファイル（`.bruby_plt`）を自動作成します。PLTファイルは`.gitignore`に含まれています。
+
 ## 重要な注意事項
 
 - パーサーはYecc文法から生成されるため、`ruby_parser.erl`を直接編集しないでください
 - ETSテーブル`ruby_classes`はcode_serverによってクラスレジストリ用に管理されています
 - すべてのアプリケーションはkernel、stdlib、compilerに依存しています
 - コアモジュールには`ruby_*`、`class_*`、`code_*`のモジュール名プレフィックスパターンを使用してください
+- 新しいコードには型仕様（`-spec`）とレコードの型定義を追加してください
