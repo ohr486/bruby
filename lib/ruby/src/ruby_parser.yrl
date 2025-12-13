@@ -16,6 +16,8 @@ Terminals
   tAND tOR
   tEQ tNE tLE tGE
   '=' '+' '-' '*' '/' '%'
+  tLSHIFT tRSHIFT
+  '&' '|' '^' '~'
   '<' '>'
   '(' ')' ',' ';'
   .
@@ -30,6 +32,8 @@ Nonassoc 400 tEQ tNE.
 Nonassoc 500 '<' '>' tLE tGE.
 Left 600 '+' '-'.
 Left 700 '*' '/' '%'.
+Left 800 tLSHIFT tRSHIFT.
+Left 900 '&' '|' '^' '~'.
 
 %% プログラム全体
 program -> stmts : '$1'.
@@ -59,6 +63,12 @@ expr -> expr '-' expr : {binary_op, line_of('$2'), '-', '$1', '$3'}.
 expr -> expr '*' expr : {binary_op, line_of('$2'), '*', '$1', '$3'}.
 expr -> expr '/' expr : {binary_op, line_of('$2'), '/', '$1', '$3'}.
 expr -> expr '%' expr : {binary_op, line_of('$2'), '%', '$1', '$3'}.
+expr -> expr tLSHIFT expr : {binary_op, line_of('$2'), '<<', '$1', '$3'}.
+expr -> expr tRSHIFT expr : {binary_op, line_of('$2'), '>>', '$1', '$3'}.
+expr -> expr '&' expr : {binary_op, line_of('$2'), '&', '$1', '$3'}.
+expr -> expr '|' expr : {binary_op, line_of('$2'), '|', '$1', '$3'}.
+expr -> expr '^' expr : {binary_op, line_of('$2'), '^', '$1', '$3'}.
+expr -> '~' expr : {unary_op, line_of('$1'), '~', '$2'}.
 expr -> expr tEQ expr : {binary_op, line_of('$2'), '==', '$1', '$3'}.
 expr -> expr tNE expr : {binary_op, line_of('$2'), '!=', '$1', '$3'}.
 expr -> expr '<' expr : {binary_op, line_of('$2'), '<', '$1', '$3'}.
