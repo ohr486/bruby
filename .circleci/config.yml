@@ -6,12 +6,15 @@ orbs:
 jobs:
   test:
     docker:
-      - image: erlang:27
+      - image: erlang:28
     working_directory: ~/repo
     steps:
       - checkout
       - run:
           name: Build
+          command: make
+      - run:
+          name: Test
           command: make ci
       - slack/notify:
           event: always
