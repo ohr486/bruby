@@ -18,12 +18,12 @@ init(ok) ->
       [ruby_config]
     },
     {
-      code_server,
-      {code_server, start_link, []},
+      ruby_code_server,
+      {ruby_code_server, start_link, []},
       permanent,
       2000,
       worker,
-      [code_server]
+      [ruby_code_server]
     },
     {
       class_server,

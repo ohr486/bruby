@@ -3,5 +3,31 @@
 -export([test/0]).
 
 test() ->
-  io:put_chars("run our ruby tests!\n"),
-  erlang:halt(0).
+  io:format("~n========================================~n"),
+  io:format("Running bruby test suite~n"),
+  io:format("========================================~n~n"),
+
+  % トークナイザーのテスト実行
+  Result = try
+    test_tokenizer:test(),
+    success
+  catch
+    Error:Reason:Stacktrace ->
+      io:format("~n[ERROR] Test failed:~n"),
+      io:format("  Error: ~p~n", [Error]),
+      io:format("  Reason: ~p~n", [Reason]),
+      io:format("  Stacktrace: ~p~n", [Stacktrace]),
+      failure
+  end,
+
+  io:format("~n========================================~n"),
+  case Result of
+    success ->
+      io:format("All tests passed!~n"),
+      io:format("========================================~n~n"),
+      erlang:halt(0);
+    failure ->
+      io:format("Some tests failed!~n"),
+      io:format("========================================~n~n"),
+      erlang:halt(1)
+  end.
