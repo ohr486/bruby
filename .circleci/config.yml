@@ -14,8 +14,14 @@ jobs:
           name: Build
           command: make
       - run:
+          name: Lint
+          command: make lint
+      - run:
+          name: Dialyzer
+          command: make dialyzer
+      - run:
           name: Test
-          command: make ci
+          command: make test
       - slack/notify:
           event: always
 

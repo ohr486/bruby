@@ -18,7 +18,6 @@ default: compile
 
 compile: compile_ruby compile_irb compile_epmd
 test: test_ruby test_irb test_epmd
-ci: compile test lint
 
 
 # ---------- PRE BUILD RUBY ----------

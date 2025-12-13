@@ -22,9 +22,6 @@ make
 # すべてのテストを実行
 make test
 
-# ビルドとテスト (CIパイプライン)
-make ci
-
 # すべての生成ファイルをクリーン
 make clean
 
@@ -116,8 +113,11 @@ rubyアプリケーションは以下を管理する監視ツリー (ruby_sup) �
 
 ## CI/CD
 
-CircleCIがすべてのコミットでErlang 27 Dockerイメージを使用して実行されます：
-- `make ci` (compile + test) を実行
+CircleCIがすべてのコミットでErlang 28 Dockerイメージを使用して実行されます：
+- `make` (ビルド)
+- `make lint` (Lintチェック)
+- `make dialyzer` (型チェック)
+- `make test` (テスト)
 - Slack通知がorb経由で設定済み
 
 ## Lint & 静的解析
