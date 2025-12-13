@@ -139,7 +139,7 @@ clean:
 	rm -rf lib/*/test/ebin/
 	rm -f erl_crash.dump
 	rm -f bin/erl_crash.dump
-	rm -rf $(RUBY_PARSER)
+	rm -f $(RUBY_PARSER)
 	rm -rf lib/**/*.beam
 	rm -f .bruby_plt
 

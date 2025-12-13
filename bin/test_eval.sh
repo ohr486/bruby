@@ -20,7 +20,12 @@ Demos = [
     {7, "Logical operators", "true and false or true"},
     {8, "Bitwise operations", "12 & 10"},
     {9, "Complex expression", "((10 + 5) * 2 - 6) / 3"},
-    {10, "Variable accumulation", "sum = 0; i = 1; while i <= 10 sum = sum + i; i = i + 1 end; sum"}
+    {10, "Variable accumulation", "sum = 0; i = 1; while i <= 10 sum = sum + i; i = i + 1 end; sum"},
+    {11, "Method definition and call", "def add(x, y) x + y end; add(3, 4)"},
+    {12, "Method with local variable", "def compute(x) y = 10; x + y end; compute(5)"},
+    {13, "Method calling method", "def double(x) x * 2 end; def quadruple(x) double(double(x)) end; quadruple(3)"},
+    {14, "Method with return", "def check(x) if x > 10 return 999 end; 1 end; check(15)"},
+    {15, "Method with expression arg", "def triple(x) x * 3 end; triple(2 + 3)"}
 ],
 
 lists:foreach(fun({Num, Name, Code}) ->

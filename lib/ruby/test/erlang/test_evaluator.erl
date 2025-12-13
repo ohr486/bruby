@@ -14,6 +14,7 @@ test() ->
   test_if_statements(),
   test_while_statements(),
   test_until_statements(),
+  test_method_operations(),
 
   io:format("~n=== All Evaluator Tests Passed ===~n"),
   ok.
@@ -315,5 +316,86 @@ test_until_statements() ->
     {integer, 3, 20}
   ],
   assert_eval(AST2, 20, "until loop (never executed)"),
+
+  ok.
+
+test_method_operations() ->
+  % 引数なしのメソッド定義と呼び出し
+  AST1 = [
+    {method_def, 1, "hello", [], [{integer, 2, 42}]},
+    {call, 3, "hello", []}
+  ],
+  assert_eval(AST1, 42, "method definition and call (no args)"),
+
+  % 引数1つのメソッド定義と呼び出し
+  AST2 = [
+    {method_def, 1, "double", [{param, 1, "x"}],
+     [{binary_op, 2, '*', {identifier, 2, "x"}, {integer, 2, 2}}]},
+    {call, 3, "double", [{integer, 3, 5}]}
+  ],
+  assert_eval(AST2, 10, "method with one parameter"),
+
+  % 引数2つのメソッド定義と呼び出し
+  AST3 = [
+    {method_def, 1, "add", [{param, 1, "x"}, {param, 1, "y"}],
+     [{binary_op, 2, '+', {identifier, 2, "x"}, {identifier, 2, "y"}}]},
+    {call, 3, "add", [{integer, 3, 3}, {integer, 3, 4}]}
+  ],
+  assert_eval(AST3, 7, "method with two parameters"),
+
+  % メソッド内でのローカル変数
+  AST4 = [
+    {method_def, 1, "compute", [{param, 1, "x"}],
+     [
+       {assign, 2, {var, 2, "y"}, {integer, 2, 10}},
+       {binary_op, 3, '+', {identifier, 3, "x"}, {identifier, 3, "y"}}
+     ]},
+    {call, 4, "compute", [{integer, 4, 5}]}
+  ],
+  assert_eval(AST4, 15, "method with local variable"),
+
+  % return文を持つメソッド
+  AST5 = [
+    {method_def, 1, "early_return", [{param, 1, "x"}],
+     [
+       {if_stmt, 2,
+        {binary_op, 2, '>', {identifier, 2, "x"}, {integer, 2, 10}},
+        [{return, 3, {integer, 3, 999}}],
+        [],
+        []},
+       {integer, 4, 1}
+     ]},
+    {call, 5, "early_return", [{integer, 5, 15}]}
+  ],
+  assert_eval(AST5, 999, "method with early return"),
+
+  % メソッド呼び出しに式を渡す
+  AST6 = [
+    {method_def, 1, "triple", [{param, 1, "x"}],
+     [{binary_op, 2, '*', {identifier, 2, "x"}, {integer, 2, 3}}]},
+    {call, 3, "triple", [{binary_op, 3, '+', {integer, 3, 2}, {integer, 3, 3}}]}
+  ],
+  assert_eval(AST6, 15, "method call with expression argument"),
+
+  % メソッドからメソッドを呼び出す
+  AST7 = [
+    {method_def, 1, "square", [{param, 1, "x"}],
+     [{binary_op, 2, '*', {identifier, 2, "x"}, {identifier, 2, "x"}}]},
+    {method_def, 3, "square_plus_one", [{param, 3, "x"}],
+     [{binary_op, 4, '+', {call, 4, "square", [{identifier, 4, "x"}]}, {integer, 4, 1}}]},
+    {call, 5, "square_plus_one", [{integer, 5, 4}]}
+  ],
+  assert_eval(AST7, 17, "method calling another method"),
+
+  % 未定義メソッドの呼び出しエラー
+  assert_eval_error([{call, 1, "undefined_method", []}], "undefined method error"),
+
+  % 引数の数が間違っている場合のエラー
+  AST8 = [
+    {method_def, 1, "add", [{param, 1, "x"}, {param, 1, "y"}],
+     [{binary_op, 2, '+', {identifier, 2, "x"}, {identifier, 2, "y"}}]},
+    {call, 3, "add", [{integer, 3, 3}]}
+  ],
+  assert_eval_error(AST8, "wrong number of arguments error"),
 
   ok.
