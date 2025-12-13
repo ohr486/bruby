@@ -5,7 +5,7 @@
 ## プロジェクト概要
 
 brubyはBEAM (Erlang VM) 上で動作するRuby実装です。プロジェクトは3つの主要なOTPアプリケーションで構成されています：
-- **ruby**: トークナイザ、パーサー、ランタイムを含むRuby言語のコア実装
+- **ruby**: トークナイザ、パーサー、評価器を含むRuby言語のコア実装
 - **irb**: インタラクティブRubyシェル (REPL)
 - **epmd**: Erlang Port Mapper Daemonコンポーネント
 
@@ -57,6 +57,15 @@ make test_epmd
 
 # インタラクティブREPLを実行
 ./bin/birb
+
+# トークナイザーのテスト（トークン化の出力を確認）
+./bin/test_tokenizer.sh "def hello(name); puts name; end"
+
+# パーサーのテスト（AST出力を確認）
+./bin/test_parser.sh "1 + 2 * 3"
+
+# 評価器のテスト（10個のサンプルRubyプログラムを実行）
+./bin/test_eval.sh
 ```
 
 ### Docker開発環境
@@ -75,7 +84,7 @@ cd docker
 各アプリケーションは標準的なOTP規約に従っています：
 - `lib/<app>/src/`: ソースファイル (.erl, .yrl, .hrl, .app.src)
 - `lib/<app>/ebin/`: コンパイル済みbeamファイルと.appファイル (生成)
-- `lib/<app>/test/erlang/`: EUnitテストファイル
+- `lib/<app>/test/erlang/`: テストファイル
 - `lib/<app>/test/ebin/`: コンパイル済みテストbeamファイル (生成)
 - `lib/<app>/Emakefile`: Erlangコンパイラ設定
 
@@ -83,12 +92,13 @@ cd docker
 
 rubyアプリケーションは以下を管理する監視ツリー (ruby_sup) を使用しています：
 1. **ruby_config**: 設定用gen_server
-2. **code_server**: ETS (ruby_classesテーブル) を使用してRubyクラス定義と参照を管理
+2. **ruby_code_server**: ETS (ruby_classesテーブル) を使用してRubyクラス定義と参照を管理
 3. **class_server**: クラスプール管理用gen_server
 
 **パーサーパイプライン:**
-- `ruby_tokenizer.erl`: 字句解析 (現在はスタブ実装)
+- `ruby_tokenizer.erl`: 字句解析 - Rubyソースコードをトークンに変換
 - `ruby_parser.yrl`: `ruby_parser.erl`を生成するYecc文法ファイル
+- `ruby_evaluator.erl`: パーサーが生成したASTを評価
 - パーサーはコンパイル前にYecc文法からビルドされます
 
 **エントリーポイント:**
@@ -106,10 +116,33 @@ rubyアプリケーションは以下を管理する監視ツリー (ruby_sup) �
 
 ## テスト
 
-テストは現在確認メッセージを表示するだけの最小限のtest_helperモジュールを使用しています。テスト実行：
+テストシステムはtest_helperモジュールをエントリーポイントとして使用しています：
 - `test/erlang/`から`test/ebin/`へテスト.erlファイルをコンパイル
 - `erl -pa <test_ebin> -s test_helper test`を実行
-- テストは`test_helper:test/0`を呼び出し、コード0で終了
+- test_helper:test/0がtest_tokenizer、test_parser、test_evaluatorを実行
+- 成功時はコード0、失敗時はコード1で終了
+
+### Erlangシェルでの対話的テスト
+
+評価器を対話的にテストできます：
+```sh
+erl -pa lib/ruby/ebin
+```
+
+```erlang
+% 基本的な算術演算
+ruby_evaluator:eval_string("1 + 2 * 3").
+% {ok,7,#{bindings => #{},parent => nil,return_value => undefined}}
+
+% 変数
+ruby_evaluator:eval_string("x = 10; y = 20; x + y").
+% {ok,30,#{bindings => #{x => 10,y => 20},...}}
+
+% 前の環境を引き継いで評価を続ける
+{ok, Result1, Env1} = ruby_evaluator:eval_string("x = 10").
+{ok, Result2, Env2} = ruby_evaluator:eval_string("y = 20; x + y", Env1).
+% Result2は30（xの値が保持されている）
+```
 
 ## CI/CD
 
@@ -144,8 +177,30 @@ Dialyzerは型の不整合とエラーを検出します。初回実行時にPLT
 
 ## 重要な注意事項
 
-- パーサーはYecc文法から生成されるため、`ruby_parser.erl`を直接編集しないでください
+- **`ruby_parser.erl`を直接編集しないでください** - Yecc文法から生成されます
 - ETSテーブル`ruby_classes`はcode_serverによってクラスレジストリ用に管理されています
 - すべてのアプリケーションはkernel、stdlib、compilerに依存しています
 - コアモジュールには`ruby_*`、`class_*`、`code_*`のモジュール名プレフィックスパターンを使用してください
 - 新しいコードには型仕様（`-spec`）とレコードの型定義を追加してください
+
+## 現在の実装状況
+
+**実装済み:**
+- リテラル（整数、文字列、真偽値、nil）
+- ローカル変数（代入と参照）
+- 算術演算子（+, -, *, /, %）
+- 比較演算子（==, !=, <, >, <=, >=）
+- 論理演算子（and, or）
+- ビット演算子（&, |, ^, ~, <<, >>）
+- if/elsif/else文
+- while/until文
+- return文
+
+**未実装:**
+- メソッド呼び出しと定義
+- クラス定義
+- ブロック/イテレータ
+- シンボル
+- 配列・ハッシュ
+- 例外処理
+- break/next文
