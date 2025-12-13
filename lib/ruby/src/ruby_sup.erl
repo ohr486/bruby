@@ -1,12 +1,18 @@
+%% @doc Top-level supervisor for the Ruby application
+%% Manages ruby_config, ruby_code_server, and class_server workers
 -module(ruby_sup).
 -export([init/1, start_link/0]).
 -behaviour(supervisor).
 
-%% callback apis
+%% ============================================================================
+%% Supervisor callbacks
+%% ============================================================================
 
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
   supervisor:start_link({local, ?MODULE}, ?MODULE, ok).
 
+-spec init(term()) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init(ok) ->
   Workers = [
     {
