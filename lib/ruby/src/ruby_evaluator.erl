@@ -1,3 +1,46 @@
+%% @doc Ruby評価器（インタープリタ）
+%%
+%% このモジュールはRubyの抽象構文木（AST）を評価して実行します。
+%% Tree-walking interpreter方式で実装されており、ASTを直接走査して
+%% 各ノードを評価します。
+%%
+%% 主な機能：
+%% - リテラル（整数、文字列、真偽値、nil）の評価
+%% - 変数の束縛と参照（ローカル変数）
+%% - 演算子の評価（算術、比較、論理、ビット）
+%% - 制御フロー（if/elsif/else, while, until, return）
+%% - メソッド定義と呼び出し
+%% - クラス定義
+%% - ブロック/Proc（yield, block_given?, lambda, proc）
+%% - クロージャのサポート
+%%
+%% 環境（env）の構造：
+%% - bindings: ローカル変数の束縛（#{atom() => term()}）
+%% - methods: メソッド定義（#{atom() => method()}）
+%% - classes: クラス定義（#{atom() => class()}）
+%% - parent: 親スコープへの参照（env() | nil）
+%% - return_value: return文の値（term() | undefined）
+%% - current_block: 現在のブロック（block() | nil）
+%%
+%% 使用例：
+%% ```
+%% % 文字列からRubyコードを評価
+%% Code = "x = 10; y = 20; x + y",
+%% {ok, Result, Env} = ruby_evaluator:eval_string(Code),
+%% % Result = 30
+%%
+%% % ASTを直接評価
+%% AST = {binary_op, 1, '+', {integer, 1, 5}, {integer, 1, 3}},
+%% {ok, 8, _} = ruby_evaluator:eval(AST),
+%%
+%% % 環境を引き継いで評価
+%% {ok, _, Env1} = ruby_evaluator:eval_string("x = 100"),
+%% {ok, 100, _} = ruby_evaluator:eval_string("x", Env1).
+%% '''
+%%
+%% @author bruby development team
+%% @version 1.0.0
+
 -module(ruby_evaluator).
 -export([eval/1, eval/2, eval_string/1, eval_string/2, new_env/0, new_env/1]).
 
@@ -9,12 +52,51 @@
 %% ============================================================================
 
 %% @doc ASTをデフォルト環境で評価
+%%
+%% 抽象構文木（AST）を新しい空の環境で評価します。
+%% 環境には変数やメソッドの定義がない初期状態です。
+%%
+%% パラメータ：
+%%   - AST: 評価する抽象構文木
+%%
+%% 戻り値：
+%%   - {ok, Value, Env}: 成功時、評価結果の値と最終環境
+%%   - {error, Reason}: エラー時、エラー理由
+%%
+%% 使用例：
+%% ```
+%% AST = {integer, 1, 42},
+%% {ok, 42, _Env} = ruby_evaluator:eval(AST).
+%% '''
 -spec eval(term()) -> {ok, term(), env()} | {error, term()}.
 eval(AST) ->
     Env = new_env(),
     eval(AST, Env).
 
 %% @doc ASTを指定された環境で評価
+%%
+%% 抽象構文木（AST）を指定された環境で評価します。
+%% 環境には前の評価から引き継いだ変数やメソッドの定義が含まれます。
+%% 評価中のエラーはcatchされ、適切なエラー情報が返されます。
+%%
+%% パラメータ：
+%%   - AST: 評価する抽象構文木
+%%   - Env: 評価環境（変数、メソッド、クラスの定義を含む）
+%%
+%% 戻り値：
+%%   - {ok, Value, NewEnv}: 成功時、評価結果の値と更新された環境
+%%   - {error, Reason}: エラー時、エラー理由
+%%     - {ruby_error, Details}: Ruby実行時エラー
+%%     - {internal_error, Reason, Stacktrace}: 内部エラー
+%%
+%% 使用例：
+%% ```
+%% Env1 = ruby_evaluator:new_env(),
+%% AST1 = {assign, 1, {var, 1, x}, {integer, 1, 10}},
+%% {ok, 10, Env2} = ruby_evaluator:eval(AST1, Env1),
+%% AST2 = {identifier, 1, x},
+%% {ok, 10, _} = ruby_evaluator:eval(AST2, Env2).
+%% '''
 -spec eval(term(), env()) -> {ok, term(), env()} | {error, term()}.
 eval(AST, Env) when is_map(Env) ->
     try
@@ -28,11 +110,50 @@ eval(AST, Env) when is_map(Env) ->
     end.
 
 %% @doc Rubyコード文字列を評価（トークナイザー + パーサー + 評価器の統合）
+%%
+%% Rubyソースコードの文字列を、トークン化→パース→評価の
+%% 完全なパイプラインで処理します。新しい空の環境で評価されます。
+%% これはbrubyの最も高レベルなAPIです。
+%%
+%% パラメータ：
+%%   - Code: Rubyソースコード（文字列またはバイナリ）
+%%
+%% 戻り値：
+%%   - {ok, Value, Env}: 成功時、評価結果の値と最終環境
+%%   - {error, Error}: エラー時、エラー情報
+%%     - {tokenize_error, Details}: トークン化エラー
+%%     - {parse_error, Details}: パースエラー
+%%     - その他: 評価エラー
+%%
+%% 使用例：
+%% ```
+%% {ok, 30, _} = ruby_evaluator:eval_string("x = 10; y = 20; x + y"),
+%% {ok, 42, _} = ruby_evaluator:eval_string("def add(a,b) a+b end; add(40,2)").
+%% '''
 -spec eval_string(string() | binary()) -> {ok, term(), env()} | {error, term()}.
 eval_string(Code) ->
     eval_string(Code, new_env()).
 
 %% @doc Rubyコード文字列を指定環境で評価
+%%
+%% Rubyソースコードの文字列を指定された環境で評価します。
+%% 前の評価から環境を引き継ぐことで、変数やメソッドの定義を保持できます。
+%% インタラクティブシェル（REPL）の実装に使用されます。
+%%
+%% パラメータ：
+%%   - Code: Rubyソースコード（文字列またはバイナリ）
+%%   - Env: 評価環境（変数、メソッド、クラスの定義を含む）
+%%
+%% 戻り値：
+%%   - {ok, Value, NewEnv}: 成功時、評価結果の値と更新された環境
+%%   - {error, Error}: エラー時、エラー情報
+%%
+%% 使用例：
+%% ```
+%% {ok, 10, Env1} = ruby_evaluator:eval_string("x = 10"),
+%% {ok, 30, Env2} = ruby_evaluator:eval_string("y = 20; x + y", Env1),
+%% % Env1の変数xがEnv2でも利用可能
+%% '''
 -spec eval_string(string() | binary(), env()) -> {ok, term(), env()} | {error, term()}.
 eval_string(Code, Env) when is_map(Env) ->
     % トークナイザーでトークン化
@@ -89,6 +210,25 @@ eval_string(Code, Env) when is_map(Env) ->
 }.
 
 %% @doc 新しい環境を作成
+%%
+%% 空の評価環境を作成します。
+%% 変数、メソッド、クラスの定義が含まれない初期状態の環境です。
+%% グローバルスコープやトップレベルの実行環境として使用します。
+%%
+%% 戻り値：
+%%   - 新しい環境（env型）
+%%     - bindings: 空のマップ（変数なし）
+%%     - methods: 空のマップ（メソッドなし）
+%%     - classes: 空のマップ（クラスなし）
+%%     - parent: nil（親スコープなし）
+%%     - return_value: undefined（return文未実行）
+%%     - current_block: nil（ブロックなし）
+%%
+%% 使用例：
+%% ```
+%% Env = ruby_evaluator:new_env(),
+%% {ok, _, _} = ruby_evaluator:eval_string("x = 42", Env).
+%% '''
 -spec new_env() -> env().
 new_env() ->
     #{
@@ -101,6 +241,29 @@ new_env() ->
     }.
 
 %% @doc 親環境を指定して新しい環境を作成
+%%
+%% 指定された親環境を持つ新しい評価環境を作成します。
+%% メソッド呼び出しやブロック実行時に、新しいスコープを作成する際に使用します。
+%% 子環境から親環境の変数やメソッドを参照できます（スコープチェーン）。
+%%
+%% パラメータ：
+%%   - ParentEnv: 親となる環境
+%%
+%% 戻り値：
+%%   - 新しい環境（env型）
+%%     - bindings: 空のマップ（ローカル変数は空）
+%%     - methods: 空のマップ（ローカルメソッドは空）
+%%     - classes: 空のマップ（ローカルクラスは空）
+%%     - parent: ParentEnv（親環境への参照）
+%%     - return_value: undefined
+%%     - current_block: nil
+%%
+%% 使用例：
+%% ```
+%% GlobalEnv = ruby_evaluator:new_env(),
+%% LocalEnv = ruby_evaluator:new_env(GlobalEnv),
+%% % LocalEnvからGlobalEnvの定義を参照可能
+%% '''
 -spec new_env(env()) -> env().
 new_env(ParentEnv) when is_map(ParentEnv) ->
     #{
