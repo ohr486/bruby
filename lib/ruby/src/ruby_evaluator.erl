@@ -60,7 +60,8 @@ eval_string(Code, Env) when is_map(Env) ->
     methods := #{atom() => method()},    % メソッド定義
     classes := #{atom() => class()},     % クラス定義
     parent := env() | nil,               % 親スコープ
-    return_value := term() | undefined   % return文の値
+    return_value := term() | undefined,  % return文の値
+    current_block := block() | nil       % 現在のブロック（yield用）
 }.
 
 %% メソッドの型定義
@@ -69,6 +70,14 @@ eval_string(Code, Env) when is_map(Env) ->
     params := list(),
     body := list(),
     closure_env := env()  % メソッド定義時の環境（クロージャ）
+}.
+
+%% ブロック/Procの型定義
+-type block() :: #{
+    params := list(),
+    body := list(),
+    closure_env := env(),  % ブロック定義時の環境（クロージャ）
+    is_lambda := boolean() % lambdaかどうか
 }.
 
 %% クラスの型定義
@@ -87,7 +96,8 @@ new_env() ->
         methods => #{},
         classes => #{},
         parent => nil,
-        return_value => undefined
+        return_value => undefined,
+        current_block => nil
     }.
 
 %% @doc 親環境を指定して新しい環境を作成
@@ -98,7 +108,8 @@ new_env(ParentEnv) when is_map(ParentEnv) ->
         methods => #{},
         classes => #{},
         parent => ParentEnv,
-        return_value => undefined
+        return_value => undefined,
+        current_block => nil
     }.
 
 %% @doc 変数を環境に束縛
@@ -238,15 +249,24 @@ eval_node({unary_op, Line, Op, Expr}, Env) ->
     Result = eval_unary_op(Op, Val, Line),
     {Result, Env1};
 
-%% メソッド呼び出し
+%% メソッド呼び出し（ブロックなし - 後方互換性のため）
 eval_node({call, Line, Name, Args}, Env) ->
+    eval_node({call, Line, Name, Args, nil}, Env);
+
+%% メソッド呼び出し（ブロック付き）
+eval_node({call, Line, Name, Args, BlockAST}, Env) ->
     NameAtom = ensure_atom(Name),
     case lookup_method(NameAtom, Env) of
         {ok, Method} ->
             % 引数を評価
             {ArgValues, Env1} = eval_args(Args, Env, []),
-            % メソッドを呼び出し
-            call_method(Method, ArgValues, Env1, Line);
+            % ブロックを評価（ASTをブロックオブジェクトに変換）
+            Block = case BlockAST of
+                nil -> nil;
+                _ -> eval_block_ast(BlockAST, Env1, false)
+            end,
+            % メソッドを呼び出し（ブロックを渡す）
+            call_method(Method, ArgValues, Block, Env1, Line);
         {error, undefined} ->
             throw({ruby_error, {undefined_method, Line, Name}})
     end;
@@ -312,6 +332,36 @@ eval_node({break, Line}, _Env) ->
 %% next文（未実装）
 eval_node({next, Line}, _Env) ->
     throw({ruby_error, {not_implemented, Line, next_stmt}});
+
+%% yield式
+eval_node({yield, Line, Args}, Env) ->
+    case maps:get(current_block, Env) of
+        nil ->
+            throw({ruby_error, {no_block_given, Line}});
+        Block ->
+            % 引数を評価
+            {ArgValues, Env1} = eval_args(Args, Env, []),
+            % ブロックを呼び出し
+            {Result, BlockEnv} = call_block(Block, ArgValues, Env1, Line),
+            % ブロック実行後の環境から変更された変数を現在の環境にマージ
+            NewEnv = merge_closure_bindings(BlockEnv, Env1, Block),
+            {Result, NewEnv}
+    end;
+
+%% block_given?式
+eval_node({block_given, _Line}, Env) ->
+    HasBlock = maps:get(current_block, Env) =/= nil,
+    {HasBlock, Env};
+
+%% Proc.new式
+eval_node({proc_new, _Line, BlockAST}, Env) ->
+    Block = eval_block_ast(BlockAST, Env, false),
+    {Block, Env};
+
+%% lambda式
+eval_node({lambda, _Line, BlockAST}, Env) ->
+    Lambda = eval_block_ast(BlockAST, Env, true),
+    {Lambda, Env};
 
 %% 未知のノード
 eval_node(Node, _Env) ->
@@ -473,8 +523,8 @@ eval_args([Arg | Rest], Env, AccValues) ->
     eval_args(Rest, Env1, [Value | AccValues]).
 
 %% @doc メソッドを呼び出す
--spec call_method(method(), list(), env(), integer()) -> {term(), env()}.
-call_method(Method, ArgValues, CallerEnv, Line) ->
+-spec call_method(method(), list(), block() | nil, env(), integer()) -> {term(), env()}.
+call_method(Method, ArgValues, Block, CallerEnv, Line) ->
     #{
         params := ParamNames,
         body := Body,
@@ -497,11 +547,14 @@ call_method(Method, ArgValues, CallerEnv, Line) ->
     % パラメータと引数を束縛
     MethodEnv1 = bind_params(ParamNames, ArgValues, MethodEnv),
 
+    % ブロックを環境に設定
+    MethodEnv2 = maps:put(current_block, Block, MethodEnv1),
+
     % メソッド本体を評価
-    {Result, MethodEnv2} = eval_stmts(Body, MethodEnv1, nil),
+    {Result, MethodEnv3} = eval_stmts(Body, MethodEnv2, nil),
 
     % return文が実行されていた場合はその値を返す
-    case maps:get(return_value, MethodEnv2) of
+    case maps:get(return_value, MethodEnv3) of
         undefined ->
             {Result, CallerEnv};
         ReturnValue ->
@@ -515,3 +568,98 @@ bind_params([], [], Env) ->
 bind_params([ParamName | RestParams], [ArgValue | RestArgs], Env) ->
     Env1 = bind_var(ParamName, ArgValue, Env),
     bind_params(RestParams, RestArgs, Env1).
+
+%% @doc ブロックASTをブロックオブジェクトに変換
+-spec eval_block_ast(term(), env(), boolean()) -> block().
+eval_block_ast({block, _Line, Params, Body}, Env, IsLambda) ->
+    % パラメータ名のリストを抽出
+    ParamNames = extract_param_names(Params),
+    % ブロックオブジェクトを作成（クロージャとして現在の環境をキャプチャ）
+    #{
+        params => ParamNames,
+        body => Body,
+        closure_env => Env,
+        is_lambda => IsLambda
+    }.
+
+%% @doc ブロックを呼び出す
+-spec call_block(block(), list(), env(), integer()) -> {term(), env()}.
+call_block(Block, ArgValues, CallerEnv, Line) ->
+    #{
+        params := ParamNames,
+        body := Body,
+        closure_env := ClosureEnv,
+        is_lambda := IsLambda
+    } = Block,
+
+    % lambdaの場合は引数の数を厳密にチェック
+    ParamCount = length(ParamNames),
+    ArgCount = length(ArgValues),
+    if
+        IsLambda andalso (ParamCount =/= ArgCount) ->
+            throw({ruby_error, {wrong_number_of_arguments, Line, ParamCount, ArgCount}});
+        true ->
+            ok
+    end,
+
+    % ブロック実行用の環境を作成
+    % クロージャ環境と呼び出し元環境のbindingsをマージ
+    MergedBindings = maps:merge(
+        maps:get(bindings, ClosureEnv),
+        maps:get(bindings, CallerEnv)
+    ),
+    BlockEnv = ClosureEnv#{bindings => MergedBindings},
+
+    % パラメータと引数を束縛
+    % procの場合は余分な引数は無視、不足分はnilで埋める
+    BlockEnv1 = if
+        IsLambda ->
+            bind_params(ParamNames, ArgValues, BlockEnv);
+        true ->
+            bind_params_flexible(ParamNames, ArgValues, BlockEnv)
+    end,
+
+    % ブロック本体を評価
+    {Result, BlockEnv2} = eval_stmts(Body, BlockEnv1, nil),
+
+    {Result, BlockEnv2}.
+
+%% @doc ブロック実行後の変数変更を呼び出し元環境にマージ
+-spec merge_closure_bindings(env(), env(), block()) -> env().
+merge_closure_bindings(BlockEnv, CallerEnv, Block) ->
+    #{closure_env := ClosureEnv} = Block,
+
+    % ブロック実行前のクロージャ環境のバインディング
+    OriginalBindings = maps:get(bindings, ClosureEnv),
+
+    % ブロック実行後のバインディング
+    BlockBindings = maps:get(bindings, BlockEnv),
+
+    % 呼び出し元のバインディング
+    CallerBindings = maps:get(bindings, CallerEnv),
+
+    % クロージャ環境に存在していた変数、または呼び出し元に存在する変数の変更を反映
+    UpdatedBindings = maps:fold(
+        fun(Key, Value, Acc) ->
+            case maps:is_key(Key, OriginalBindings) orelse maps:is_key(Key, CallerBindings) of
+                true -> maps:put(Key, Value, Acc);
+                false -> Acc
+            end
+        end,
+        CallerBindings,
+        BlockBindings
+    ),
+
+    CallerEnv#{bindings => UpdatedBindings}.
+
+%% @doc パラメータと引数を柔軟に束縛（proc用）
+-spec bind_params_flexible(list(atom()), list(), env()) -> env().
+bind_params_flexible([], _Args, Env) ->
+    Env;
+bind_params_flexible([ParamName | RestParams], [], Env) ->
+    % 引数が足りない場合はnilで埋める
+    Env1 = bind_var(ParamName, nil, Env),
+    bind_params_flexible(RestParams, [], Env1);
+bind_params_flexible([ParamName | RestParams], [ArgValue | RestArgs], Env) ->
+    Env1 = bind_var(ParamName, ArgValue, Env),
+    bind_params_flexible(RestParams, RestArgs, Env1).

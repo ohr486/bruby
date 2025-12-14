@@ -245,6 +245,79 @@ end").
 % {ok, 'ClassB', ...}
 ```
 
+### 12. ブロックとProc
+
+#### yieldを使ったブロック実行
+
+```erlang
+% 基本的なyield
+ruby_evaluator:eval_string("def greet() yield end; greet() { 42 }").
+% {ok, 42, ...}
+
+% yieldに引数を渡す
+ruby_evaluator:eval_string("def with_value() yield(10) end; with_value() { |n| n * 2 }").
+% {ok, 20, ...}
+
+% 複数の引数を渡す
+ruby_evaluator:eval_string("def add_nums() yield(3, 4) end; add_nums() { |a, b| a + b }").
+% {ok, 7, ...}
+
+% メソッドの引数とyield
+ruby_evaluator:eval_string("def transform(n) yield(n) end; transform(10) { |x| x * 3 }").
+% {ok, 30, ...}
+
+% do...end形式のブロック
+ruby_evaluator:eval_string("def compute() yield end; compute() do 99 end").
+% {ok, 99, ...}
+```
+
+#### block_given?でブロックの有無を確認
+
+```erlang
+% ブロックが渡された場合
+ruby_evaluator:eval_string("def check() if block_given? 1 else 0 end end; check() { }").
+% {ok, 1, ...}
+
+% ブロックが渡されない場合
+ruby_evaluator:eval_string("def check() if block_given? 1 else 0 end end; check()").
+% {ok, 0, ...}
+
+% block_given?を使った条件分岐
+ruby_evaluator:eval_string("def maybe_yield(n) if block_given? yield(n) else n end end; maybe_yield(5) { |x| x * 2 }").
+% {ok, 10, ...}
+
+ruby_evaluator:eval_string("def maybe_yield(n) if block_given? yield(n) else n end end; maybe_yield(5)").
+% {ok, 5, ...}
+```
+
+#### Proc.newとlambda
+
+```erlang
+% Proc.newでブロックをオブジェクトとして保存
+ruby_evaluator:eval_string("p = proc { |x| x * 2 }; p").
+% {ok, #{...}, ...}  % Procオブジェクトが返される
+
+% lambdaでブロックを作成
+ruby_evaluator:eval_string("l = lambda { |x| x + 1 }; l").
+% {ok, #{...}, ...}  % Lambdaオブジェクトが返される
+
+% クロージャ（環境のキャプチャ）
+ruby_evaluator:eval_string("def make_multiplier(n) lambda { |x| x * n } end; mult = make_multiplier(3); mult").
+% {ok, #{...}, ...}  % nの値をキャプチャしたLambdaオブジェクト
+```
+
+#### ブロックの応用例
+
+```erlang
+% カウンターをブロックで実装
+ruby_evaluator:eval_string("def count_to(n) i = 0; while i < n yield(i); i = i + 1 end end; count_to(3) { |x| x }").
+% {ok, 2, ...}  % 最後のyieldの戻り値
+
+% 複雑な計算をブロックで
+ruby_evaluator:eval_string("def apply_twice(n) yield(yield(n)) end; apply_twice(5) { |x| x + 3 }").
+% {ok, 11, ...}  % (5 + 3) + 3 = 11
+```
+
 ## 環境を引き継いだ評価
 
 eval_string/2を使用すると、前の評価結果の環境を引き継げます：
@@ -289,6 +362,11 @@ end").
 - ✅ メソッド定義（def...end）
 - ✅ メソッド呼び出し（引数の評価、メソッドディスパッチ）
 - ✅ クラス定義（class...end）
+- ✅ ブロック（{ }、do...end）
+- ✅ yield文
+- ✅ block_given?
+- ✅ Proc.new/lambda
+- ✅ クロージャ（環境のキャプチャ）
 
 ## 未実装の機能
 
@@ -296,7 +374,8 @@ end").
 
 - ❌ クラスの継承とインスタンス化（new、インスタンス変数、インスタンスメソッド呼び出し）
 - ❌ レシーバー付きメソッド呼び出し（obj.method）
-- ❌ ブロック/イテレータ
+- ❌ Procオブジェクトの実行（.callメソッド）
+- ❌ 組み込みイテレータメソッド（each、map、selectなど）
 - ❌ シンボル
 - ❌ 配列・ハッシュ
 - ❌ 例外処理（rescue/ensure）

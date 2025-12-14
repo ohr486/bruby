@@ -12,6 +12,7 @@ test() ->
     test_tokenizer:test(),
     test_parser:test(),
     test_evaluator:test(),
+    test_blocks:test(),
     success
   catch
     Error:Reason:Stacktrace ->

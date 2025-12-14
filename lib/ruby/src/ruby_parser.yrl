@@ -8,6 +8,7 @@ Nonterminals
   class_def class_body
   while_stmt
   until_stmt
+  block block_params block_param_list
   .
 
 Terminals
@@ -23,7 +24,8 @@ Terminals
   tLSHIFT tRSHIFT
   '&' '|' '^' '~'
   '<' '>'
-  '(' ')' ',' ';'
+  '(' ')' ',' ';' '{' '}'
+  tDO tYIELD tPROC tLAMBDA tBLOCK_GIVEN
   .
 
 Rootsymbol program.
@@ -87,8 +89,11 @@ expr -> expr tGE expr : {binary_op, line_of('$2'), '>=', '$1', '$3'}.
 expr -> expr tAND expr : {binary_op, line_of('$2'), 'and', '$1', '$3'}.
 expr -> expr tOR expr : {binary_op, line_of('$2'), 'or', '$1', '$3'}.
 expr -> '(' expr ')' : '$2'.
-expr -> tIDENTIFIER '(' call_args ')' : {call, line_of('$1'), value_of('$1'), '$3'}.
-expr -> tIDENTIFIER '(' ')' : {call, line_of('$1'), value_of('$1'), []}.
+expr -> tIDENTIFIER '(' call_args ')' : {call, line_of('$1'), value_of('$1'), '$3', nil}.
+expr -> tIDENTIFIER '(' ')' : {call, line_of('$1'), value_of('$1'), [], nil}.
+expr -> tIDENTIFIER '(' call_args ')' block : {call, line_of('$1'), value_of('$1'), '$3', '$5'}.
+expr -> tIDENTIFIER '(' ')' block : {call, line_of('$1'), value_of('$1'), [], '$4'}.
+expr -> tIDENTIFIER block : {call, line_of('$1'), value_of('$1'), [], '$2'}.
 
 call_args -> arg_list : '$1'.
 
@@ -98,6 +103,12 @@ arg_list -> expr ',' arg_list : ['$1' | '$3'].
 %% プライマリ式
 primary -> literal : '$1'.
 primary -> tIDENTIFIER : {identifier, line_of('$1'), value_of('$1')}.
+primary -> tYIELD : {yield, line_of('$1'), []}.
+primary -> tYIELD '(' call_args ')' : {yield, line_of('$1'), '$3'}.
+primary -> tYIELD '(' ')' : {yield, line_of('$1'), []}.
+primary -> tBLOCK_GIVEN : {block_given, line_of('$1')}.
+primary -> tPROC block : {proc_new, line_of('$1'), '$2'}.
+primary -> tLAMBDA block : {lambda, line_of('$1'), '$2'}.
 
 %% リテラル
 literal -> tINTEGER : {integer, line_of('$1'), value_of('$1')}.
@@ -155,6 +166,22 @@ until_stmt -> tUNTIL expr stmts tEND :
   {until_stmt, line_of('$1'), '$2', '$3'}.
 until_stmt -> tUNTIL expr tEND :
   {until_stmt, line_of('$1'), '$2', []}.
+
+%% ブロック
+block -> '{' block_params stmts '}' : {block, line_of('$1'), '$2', '$3'}.
+block -> '{' block_params '}' : {block, line_of('$1'), '$2', []}.
+block -> '{' stmts '}' : {block, line_of('$1'), [], '$2'}.
+block -> '{' '}' : {block, line_of('$1'), [], []}.
+block -> tDO block_params stmts tEND : {block, line_of('$1'), '$2', '$3'}.
+block -> tDO block_params tEND : {block, line_of('$1'), '$2', []}.
+block -> tDO stmts tEND : {block, line_of('$1'), [], '$2'}.
+block -> tDO tEND : {block, line_of('$1'), [], []}.
+
+block_params -> '|' block_param_list '|' : '$2'.
+block_params -> '|' '|' : [].
+
+block_param_list -> tIDENTIFIER : [{param, line_of('$1'), value_of('$1')}].
+block_param_list -> tIDENTIFIER ',' block_param_list : [{param, line_of('$1'), value_of('$1')} | '$3'].
 
 Erlang code.
 

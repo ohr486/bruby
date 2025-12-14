@@ -25,7 +25,13 @@ Demos = [
     {12, "Method with local variable", "def compute(x) y = 10; x + y end; compute(5)"},
     {13, "Method calling method", "def double(x) x * 2 end; def quadruple(x) double(double(x)) end; quadruple(3)"},
     {14, "Method with return", "def check(x) if x > 10 return 999 end; 1 end; check(15)"},
-    {15, "Method with expression arg", "def triple(x) x * 3 end; triple(2 + 3)"}
+    {15, "Method with expression arg", "def triple(x) x * 3 end; triple(2 + 3)"},
+    {16, "Block with yield", "def greet() yield end; greet() { 42 }"},
+    {17, "Yield with argument", "def with_value() yield(10) end; with_value() { |n| n * 2 }"},
+    {18, "Yield with multiple args", "def add_nums() yield(3, 4) end; add_nums() { |a, b| a + b }"},
+    {19, "Block with do...end", "def compute() yield end; compute() do 99 end"},
+    {20, "block_given? (with block)", "def check() if block_given? 1 else 0 end end; check() { }"},
+    {21, "block_given? (without block)", "def check() if block_given? 1 else 0 end end; check()"}
 ],
 
 lists:foreach(fun({Num, Name, Code}) ->
