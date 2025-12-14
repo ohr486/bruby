@@ -246,5 +246,8 @@ identifier_or_keyword("false", Line) -> {tFALSE, Line};
 identifier_or_keyword("nil", Line) -> {tNIL, Line};
 identifier_or_keyword("self", Line) -> {tSELF, Line};
 identifier_or_keyword("super", Line) -> {tSUPER, Line};
+identifier_or_keyword("proc", Line) -> {tPROC, Line};
+identifier_or_keyword("lambda", Line) -> {tLAMBDA, Line};
+identifier_or_keyword("block_given?", Line) -> {tBLOCK_GIVEN, Line};
 identifier_or_keyword(Identifier, Line) -> {tIDENTIFIER, Line, Identifier}.
 

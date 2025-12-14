@@ -179,18 +179,18 @@ test_bitwise_operations() ->
 
 test_method_calls() ->
   % 引数なし
-  assert_parse("foo()", [{call, 1, "foo", []}], "method call no args"),
+  assert_parse("foo()", [{call, 1, "foo", [], nil}], "method call no args"),
 
   % 引数あり
-  assert_parse("foo(1)", [{call, 1, "foo", [{integer, 1, 1}]}], "method call one arg"),
+  assert_parse("foo(1)", [{call, 1, "foo", [{integer, 1, 1}], nil}], "method call one arg"),
 
   assert_parse("foo(1, 2)",
-    [{call, 1, "foo", [{integer, 1, 1}, {integer, 1, 2}]}],
+    [{call, 1, "foo", [{integer, 1, 1}, {integer, 1, 2}], nil}],
     "method call multiple args"),
 
   % 式を引数として
   assert_parse("foo(1 + 2)",
-    [{call, 1, "foo", [{binary_op, 1, '+', {integer, 1, 1}, {integer, 1, 2}}]}],
+    [{call, 1, "foo", [{binary_op, 1, '+', {integer, 1, 1}, {integer, 1, 2}}], nil}],
     "method call with expression arg"),
   ok.
 
@@ -205,7 +205,7 @@ test_assignments() ->
     "assignment with expression"),
 
   assert_parse("result = foo(42)",
-    [{assign, 1, {var, 1, "result"}, {call, 1, "foo", [{integer, 1, 42}]}}],
+    [{assign, 1, {var, 1, "result"}, {call, 1, "foo", [{integer, 1, 42}], nil}}],
     "assignment with method call"),
   ok.
 
