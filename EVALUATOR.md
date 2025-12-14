@@ -343,6 +343,87 @@ ruby_evaluator:eval_string("def apply_twice(n) yield(yield(n)) end; apply_twice(
 % {ok, 11, ...}  % (5 + 3) + 3 = 11
 ```
 
+### 13. バインディング（binding）
+
+#### bindingオブジェクトの基本
+
+```erlang
+% bindingオブジェクトを取得
+ruby_evaluator:eval_string("x = 10; y = 20; binding()").
+% {ok, #{type => binding, scope => ..., captured_bindings => #{x => 10, y => 20}}, ...}
+
+% bindingは現在のコンテキストをキャプチャする
+ruby_evaluator:eval_string("a = 100; b = 200; c = 300; binding()").
+% {ok, #{type => binding, captured_bindings => #{a => 100, b => 200, c => 300}}, ...}
+```
+
+#### メソッド内でのbinding
+
+```erlang
+% メソッド内の変数をキャプチャ
+ruby_evaluator:eval_string("def get_binding(x, y) z = x + y; binding() end; get_binding(5, 3)").
+% {ok, #{type => binding, captured_bindings => #{x => 5, y => 3, z => 8}}, ...}
+
+% ローカル変数のスコープをキャプチャ
+ruby_evaluator:eval_string("def capture_locals() local_var = 42; binding() end; capture_locals()").
+% {ok, #{type => binding, captured_bindings => #{local_var => 42}}, ...}
+```
+
+#### バインディングを使った変数の取得
+
+```erlang
+% バインディングから変数を取得
+{ok, Binding, _} = ruby_evaluator:eval_string("x = 100; y = 200; binding()"),
+{ok, 100} = ruby_scope:binding_get_variable(x, Binding),
+{ok, 200} = ruby_scope:binding_get_variable(y, Binding).
+
+% 全変数を取得
+AllVars = ruby_scope:binding_get_all_variables(Binding).
+% #{x => 100, y => 200}
+```
+
+#### バインディングを使った変数の設定
+
+```erlang
+% バインディングに新しい変数を追加
+{ok, B1, _} = ruby_evaluator:eval_string("x = 10; binding()"),
+B2 = ruby_scope:binding_set_variable(y, 20, B1),
+{ok, 10} = ruby_scope:binding_get_variable(x, B2),
+{ok, 20} = ruby_scope:binding_get_variable(y, B2).
+
+% バインディングの変数を更新
+B3 = ruby_scope:binding_set_variable(x, 999, B2),
+{ok, 999} = ruby_scope:binding_get_variable(x, B3).
+```
+
+#### 階層的なスコープのキャプチャ
+
+```erlang
+% 外側と内側のスコープをキャプチャ
+Code = "
+  x = 10
+  def foo()
+    y = 20
+    binding()
+  end
+  foo()
+",
+{ok, Binding, _} = ruby_evaluator:eval_string(Code),
+% Bindingには y => 20 が含まれる（メソッド内のローカル変数）
+
+% グローバルとローカルの両方をキャプチャ
+Code2 = "
+  global = 100
+  def bar()
+    local = 200
+    binding()
+  end
+  bar()
+",
+{ok, Binding2, _} = ruby_evaluator:eval_string(Code2).
+% Binding2には local => 200 が含まれる
+```
+
 ## 環境を引き継いだ評価
 
 eval_string/2を使用すると、前の評価結果の環境を引き継げます：
@@ -392,6 +473,7 @@ end").
 - ✅ block_given?
 - ✅ Proc.new/lambda
 - ✅ クロージャ（環境のキャプチャ）
+- ✅ binding（バインディングオブジェクト）
 
 ## 未実装の機能
 
