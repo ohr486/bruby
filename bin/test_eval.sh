@@ -31,7 +31,9 @@ Demos = [
     {18, "Yield with multiple args", "def add_nums() yield(3, 4) end; add_nums() { |a, b| a + b }"},
     {19, "Block with do...end", "def compute() yield end; compute() do 99 end"},
     {20, "block_given? (with block)", "def check() if block_given? 1 else 0 end end; check() { }"},
-    {21, "block_given? (without block)", "def check() if block_given? 1 else 0 end end; check()"}
+    {21, "block_given? (without block)", "def check() if block_given? 1 else 0 end end; check()"},
+    {22, "Nested scope (method)", "x = 10; def foo() x = 20; x end; foo()"},
+    {23, "Variable shadowing", "x = 100; if true x = 200 end; x"}
 ],
 
 lists:foreach(fun({Num, Name, Code}) ->
