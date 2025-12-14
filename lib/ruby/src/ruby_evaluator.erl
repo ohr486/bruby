@@ -42,7 +42,7 @@
 %% @version 1.0.0
 
 -module(ruby_evaluator).
--export([eval/1, eval/2, eval_string/1, eval_string/2, new_env/0, new_env/1]).
+-export([eval/1, eval/2, eval_string/1, eval_string/2, new_env/0, new_env/1, binding_to_env/1]).
 
 %% 将来のクラスインスタンス化で使用予定のため警告を抑制
 -compile({nowarn_unused_function, [{lookup_class, 2}]}).
@@ -419,19 +419,28 @@ eval_node({call, Line, Name, Args}, Env) ->
 %% メソッド呼び出し（ブロック付き）
 eval_node({call, Line, Name, Args, BlockAST}, Env) ->
     NameAtom = ensure_atom(Name),
-    case lookup_method(NameAtom, Env) of
-        {ok, Method} ->
-            % 引数を評価
-            {ArgValues, Env1} = eval_args(Args, Env, []),
-            % ブロックを評価（ASTをブロックオブジェクトに変換）
-            Block = case BlockAST of
-                nil -> nil;
-                _ -> eval_block_ast(BlockAST, Env1, false)
-            end,
-            % メソッドを呼び出し（ブロックを渡す）
-            call_method(Method, ArgValues, Block, Env1, Line);
-        {error, undefined} ->
-            throw({ruby_error, {undefined_method, Line, Name}})
+    % 組み込みメソッドのチェック
+    case NameAtom of
+        binding when Args =:= [] ->
+            % bindingメソッド: 現在の環境からバインディングオブジェクトを作成
+            Binding = env_to_binding(Env),
+            {Binding, Env};
+        _ ->
+            % 通常のメソッド呼び出し
+            case lookup_method(NameAtom, Env) of
+                {ok, Method} ->
+                    % 引数を評価
+                    {ArgValues, Env1} = eval_args(Args, Env, []),
+                    % ブロックを評価（ASTをブロックオブジェクトに変換）
+                    Block = case BlockAST of
+                        nil -> nil;
+                        _ -> eval_block_ast(BlockAST, Env1, false)
+                    end,
+                    % メソッドを呼び出し（ブロックを渡す）
+                    call_method(Method, ArgValues, Block, Env1, Line);
+                {error, undefined} ->
+                    throw({ruby_error, {undefined_method, Line, Name}})
+            end
     end;
 
 %% メソッド定義
@@ -525,6 +534,12 @@ eval_node({proc_new, _Line, BlockAST}, Env) ->
 eval_node({lambda, _Line, BlockAST}, Env) ->
     Lambda = eval_block_ast(BlockAST, Env, true),
     {Lambda, Env};
+
+%% binding式
+eval_node({binding, _Line}, Env) ->
+    % 現在の環境からバインディングオブジェクトを作成
+    Binding = env_to_binding(Env),
+    {Binding, Env};
 
 %% 未知のノード
 eval_node(Node, _Env) ->
@@ -826,3 +841,86 @@ bind_params_flexible([ParamName | RestParams], [], Env) ->
 bind_params_flexible([ParamName | RestParams], [ArgValue | RestArgs], Env) ->
     Env1 = bind_var(ParamName, ArgValue, Env),
     bind_params_flexible(RestParams, RestArgs, Env1).
+
+%% ============================================================================
+%% バインディング管理
+%% ============================================================================
+
+%% @doc 評価環境からバインディングオブジェクトを作成
+%%
+%% ruby_evaluatorのenv型からruby_scopeのバインディングオブジェクトを作成します。
+%% envのbindings（ローカル変数）をruby_scopeのスコープ形式に変換し、
+%% バインディングオブジェクトとしてカプセル化します。
+%%
+%% パラメータ：
+%%   - Env: 評価環境（env型）
+%%
+%% 戻り値：
+%%   - バインディングオブジェクト（ruby_scope:binding型）
+%%
+%% 使用例：
+%% ```
+%% Env = ruby_evaluator:new_env(),
+%% Env1 = bind_var(x, 10, Env),
+%% Binding = env_to_binding(Env1),
+%% % Bindingには x => 10 が含まれる
+%% '''
+-spec env_to_binding(env()) -> ruby_scope:binding().
+env_to_binding(Env) when is_map(Env) ->
+    % envをruby_scopeのスコープに変換
+    Scope = env_to_scope(Env),
+    % スコープからバインディングを作成
+    ruby_scope:create_binding(Scope).
+
+%% @doc 評価環境をruby_scopeのスコープに変換
+%%
+%% ruby_evaluatorのenv型からruby_scopeのscope型に変換します。
+%% envの階層構造（parent）をスコープチェーンとして再構築します。
+%%
+%% パラメータ：
+%%   - Env: 評価環境（env型）
+%%
+%% 戻り値：
+%%   - スコープ（ruby_scope:scope型）
+%%
+%% 内部関数として使用されます。
+-spec env_to_scope(env()) -> ruby_scope:scope().
+env_to_scope(Env) when is_map(Env) ->
+    % envのbindingsを取得
+    Bindings = maps:get(bindings, Env),
+    % 親環境を変換
+    ParentScope = case maps:get(parent, Env) of
+        nil -> nil;
+        ParentEnv -> env_to_scope(ParentEnv)
+    end,
+    % ruby_scopeのスコープを作成
+    #{
+        bindings => Bindings,
+        parent => ParentScope
+    }.
+
+%% @doc バインディングオブジェクトから評価環境を作成
+%%
+%% ruby_scopeのバインディングオブジェクトからruby_evaluatorのenv型を作成します。
+%% バインディングに含まれる変数を新しい環境のbindingsとして設定します。
+%% eval(code, binding)のようにバインディングのコンテキストでコードを実行する際に使用します。
+%%
+%% パラメータ：
+%%   - Binding: バインディングオブジェクト（ruby_scope:binding型）
+%%
+%% 戻り値：
+%%   - 評価環境（env型）
+%%
+%% 使用例：
+%% ```
+%% % バインディングから環境を復元してコードを評価
+%% Env = binding_to_env(Binding),
+%% {ok, Result, _} = eval_string("x + y", Env).
+%% '''
+-spec binding_to_env(ruby_scope:binding()) -> env().
+binding_to_env(Binding) when is_map(Binding) ->
+    % バインディングから全変数を取得
+    AllBindings = ruby_scope:binding_get_all_variables(Binding),
+    % 新しい環境を作成してバインディングを設定
+    Env = new_env(),
+    Env#{bindings => AllBindings}.

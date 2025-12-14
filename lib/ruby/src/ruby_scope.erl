@@ -40,7 +40,15 @@
     get_parent/1,
     push/2,
     pop/1,
-    current/1
+    current/1,
+    % バインディング管理
+    create_binding/1,
+    binding_get_variable/2,
+    binding_set_variable/3,
+    binding_get_all_variables/1,
+    binding_to_scope/1,
+    capture_closure_bindings/2,
+    flatten_bindings/1
 ]).
 
 %% ============================================================================
@@ -61,7 +69,16 @@
     stack := [scope()]       % スコープのスタック（push/popで使用）
 }.
 
--export_type([scope/0, scope_stack/0]).
+%% @doc バインディングオブジェクトの型定義
+%% バインディングはRubyの実行コンテキストをカプセル化する
+%% 特定のスコープの状態をキャプチャし、後で復元できる
+-type binding() :: #{
+    type := binding,              % バインディングオブジェクトであることを示す
+    scope := scope(),             % キャプチャされたスコープ
+    captured_bindings := #{atom() => term()}  % フラット化された全変数の束縛
+}.
+
+-export_type([scope/0, scope_stack/0, binding/0]).
 
 %% ============================================================================
 %% スコープ生成と破棄
@@ -350,3 +367,221 @@ pop(ScopeStack) when is_map(ScopeStack) ->
 -spec current(scope_stack()) -> scope().
 current(ScopeStack) when is_map(ScopeStack) ->
     maps:get(current, ScopeStack).
+
+%% ============================================================================
+%% バインディング管理
+%% ============================================================================
+
+%% @doc スコープからバインディングオブジェクトを作成
+%%
+%% 指定されたスコープの状態をキャプチャしてバインディングオブジェクトを作成します。
+%% バインディングオブジェクトは、スコープチェーン全体の変数をフラット化して保持します。
+%% これにより、Rubyの`binding`メソッドと同様に、現在のコンテキストを
+%% 保存して後で`eval`などで使用できます。
+%%
+%% パラメータ：
+%%   - Scope: キャプチャするスコープ
+%%
+%% 戻り値：
+%%   - バインディングオブジェクト（binding型）
+%%
+%% 使用例：
+%% ```
+%% Scope1 = ruby_scope:new(),
+%% Scope2 = ruby_scope:bind(x, 10, Scope1),
+%% Scope3 = ruby_scope:bind(y, 20, Scope2),
+%% Binding = ruby_scope:create_binding(Scope3),
+%% % Bindingには x => 10, y => 20 の情報が含まれる
+%% '''
+-spec create_binding(scope()) -> binding().
+create_binding(Scope) when is_map(Scope) ->
+    % スコープチェーン全体の変数をフラット化
+    FlattenedBindings = flatten_bindings(Scope),
+    #{
+        type => binding,
+        scope => Scope,
+        captured_bindings => FlattenedBindings
+    }.
+
+%% @doc バインディングから変数を取得
+%%
+%% バインディングオブジェクトに保存されている変数の値を取得します。
+%% スコープチェーン全体から変数を検索します。
+%%
+%% パラメータ：
+%%   - Name: 変数名（atom型）
+%%   - Binding: バインディングオブジェクト
+%%
+%% 戻り値：
+%%   - {ok, Value}: 変数が見つかった場合、その値を返す
+%%   - {error, undefined}: 変数が見つからなかった場合
+%%
+%% 使用例：
+%% ```
+%% Scope1 = ruby_scope:new(),
+%% Scope2 = ruby_scope:bind(x, 100, Scope1),
+%% Binding = ruby_scope:create_binding(Scope2),
+%% {ok, 100} = ruby_scope:binding_get_variable(x, Binding).
+%% '''
+-spec binding_get_variable(atom(), binding()) -> {ok, term()} | {error, undefined}.
+binding_get_variable(Name, Binding) when is_atom(Name), is_map(Binding) ->
+    CapturedBindings = maps:get(captured_bindings, Binding),
+    case maps:find(Name, CapturedBindings) of
+        {ok, Value} ->
+            {ok, Value};
+        error ->
+            {error, undefined}
+    end.
+
+%% @doc バインディングに変数を設定
+%%
+%% バインディングオブジェクトに新しい変数を追加、または既存の変数を更新します。
+%% 元のバインディングは変更されず、新しいバインディングが返されます。
+%%
+%% パラメータ：
+%%   - Name: 変数名（atom型）
+%%   - Value: 設定する値
+%%   - Binding: バインディングオブジェクト
+%%
+%% 戻り値：
+%%   - 変数が設定された新しいバインディング
+%%
+%% 使用例：
+%% ```
+%% Binding1 = ruby_scope:create_binding(ruby_scope:new()),
+%% Binding2 = ruby_scope:binding_set_variable(x, 42, Binding1),
+%% {ok, 42} = ruby_scope:binding_get_variable(x, Binding2).
+%% '''
+-spec binding_set_variable(atom(), term(), binding()) -> binding().
+binding_set_variable(Name, Value, Binding) when is_atom(Name), is_map(Binding) ->
+    CapturedBindings = maps:get(captured_bindings, Binding),
+    NewCapturedBindings = maps:put(Name, Value, CapturedBindings),
+    Scope = maps:get(scope, Binding),
+    NewScope = bind(Name, Value, Scope),
+    Binding#{
+        captured_bindings => NewCapturedBindings,
+        scope => NewScope
+    }.
+
+%% @doc バインディング内の全変数を取得
+%%
+%% バインディングオブジェクトに保存されている全ての変数名と値のマップを返します。
+%% スコープチェーン全体の変数がフラット化されて返されます。
+%%
+%% パラメータ：
+%%   - Binding: バインディングオブジェクト
+%%
+%% 戻り値：
+%%   - 変数名から値へのマップ（#{atom() => term()}）
+%%
+%% 使用例：
+%% ```
+%% Scope1 = ruby_scope:new(),
+%% Scope2 = ruby_scope:bind(x, 10, Scope1),
+%% Scope3 = ruby_scope:bind(y, 20, Scope2),
+%% Binding = ruby_scope:create_binding(Scope3),
+%% AllVars = ruby_scope:binding_get_all_variables(Binding),
+%% % AllVars = #{x => 10, y => 20}
+%% '''
+-spec binding_get_all_variables(binding()) -> #{atom() => term()}.
+binding_get_all_variables(Binding) when is_map(Binding) ->
+    maps:get(captured_bindings, Binding).
+
+%% @doc バインディングをスコープに変換
+%%
+%% バインディングオブジェクトから元のスコープを取得します。
+%% evalなどでバインディングのコンテキストでコードを実行する際に使用します。
+%%
+%% パラメータ：
+%%   - Binding: バインディングオブジェクト
+%%
+%% 戻り値：
+%%   - スコープ
+%%
+%% 使用例：
+%% ```
+%% OriginalScope = ruby_scope:new(),
+%% Binding = ruby_scope:create_binding(OriginalScope),
+%% Scope = ruby_scope:binding_to_scope(Binding),
+%% % Scope と OriginalScope は同じ
+%% '''
+-spec binding_to_scope(binding()) -> scope().
+binding_to_scope(Binding) when is_map(Binding) ->
+    Scope = maps:get(scope, Binding),
+    % captured_bindingsの最新の値でスコープを更新
+    CapturedBindings = maps:get(captured_bindings, Binding),
+    set_bindings(CapturedBindings, Scope).
+
+%% @doc クロージャのバインディングをキャプチャ
+%%
+%% 指定されたスコープから、指定された変数名のリストに該当する変数のみを
+%% キャプチャしたバインディングを作成します。
+%% クロージャで特定の変数のみをキャプチャする場合に使用します。
+%%
+%% パラメータ：
+%%   - VarNames: キャプチャする変数名のリスト（[atom()]）
+%%   - Scope: 元となるスコープ
+%%
+%% 戻り値：
+%%   - 指定された変数のみを含むバインディングマップ（#{atom() => term()}）
+%%
+%% 使用例：
+%% ```
+%% Scope1 = ruby_scope:new(),
+%% Scope2 = ruby_scope:bind(x, 10, Scope1),
+%% Scope3 = ruby_scope:bind(y, 20, Scope2),
+%% Scope4 = ruby_scope:bind(z, 30, Scope3),
+%% Captured = ruby_scope:capture_closure_bindings([x, y], Scope4),
+%% % Captured = #{x => 10, y => 20}  (zは含まれない)
+%% '''
+-spec capture_closure_bindings([atom()], scope()) -> #{atom() => term()}.
+capture_closure_bindings(VarNames, Scope) when is_list(VarNames), is_map(Scope) ->
+    lists:foldl(
+        fun(VarName, Acc) ->
+            case lookup(VarName, Scope) of
+                {ok, Value} ->
+                    maps:put(VarName, Value, Acc);
+                {error, undefined} ->
+                    Acc
+            end
+        end,
+        #{},
+        VarNames
+    ).
+
+%% @doc スコープチェーン全体の変数をフラット化
+%%
+%% スコープチェーンを辿って、全ての親スコープの変数を含む
+%% フラット化されたバインディングマップを作成します。
+%% 同じ変数名が複数のスコープに存在する場合、より内側（子）のスコープの値が優先されます。
+%%
+%% パラメータ：
+%%   - Scope: フラット化するスコープ
+%%
+%% 戻り値：
+%%   - 全スコープの変数を含むマップ（#{atom() => term()}）
+%%
+%% 使用例：
+%% ```
+%% GlobalScope1 = ruby_scope:new(),
+%% GlobalScope2 = ruby_scope:bind(x, 10, GlobalScope1),
+%% LocalScope1 = ruby_scope:new(GlobalScope2),
+%% LocalScope2 = ruby_scope:bind(y, 20, LocalScope1),
+%% Flattened = ruby_scope:flatten_bindings(LocalScope2),
+%% % Flattened = #{x => 10, y => 20}
+%% '''
+-spec flatten_bindings(scope()) -> #{atom() => term()}.
+flatten_bindings(Scope) when is_map(Scope) ->
+    flatten_bindings_recursive(Scope, #{}).
+
+%% @doc スコープチェーンを再帰的に辿ってバインディングを収集（内部関数）
+-spec flatten_bindings_recursive(scope() | nil, #{atom() => term()}) -> #{atom() => term()}.
+flatten_bindings_recursive(nil, Acc) ->
+    Acc;
+flatten_bindings_recursive(Scope, Acc) when is_map(Scope) ->
+    % 親スコープを先に処理（親の値が基本となる）
+    Parent = maps:get(parent, Scope),
+    AccWithParent = flatten_bindings_recursive(Parent, Acc),
+    % 現在のスコープの変数で上書き（子スコープの値が優先）
+    CurrentBindings = maps:get(bindings, Scope),
+    maps:merge(AccWithParent, CurrentBindings).

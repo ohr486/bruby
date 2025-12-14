@@ -33,7 +33,9 @@ Demos = [
     {20, "block_given? (with block)", "def check() if block_given? 1 else 0 end end; check() { }"},
     {21, "block_given? (without block)", "def check() if block_given? 1 else 0 end end; check()"},
     {22, "Nested scope (method)", "x = 10; def foo() x = 20; x end; foo()"},
-    {23, "Variable shadowing", "x = 100; if true x = 200 end; x"}
+    {23, "Variable shadowing", "x = 100; if true x = 200 end; x"},
+    {24, "Binding object creation", "x = 10; y = 20; binding()"},
+    {25, "Binding in method", "def get_binding(a, b) c = a + b; binding() end; get_binding(5, 3)"}
 ],
 
 lists:foreach(fun({Num, Name, Code}) ->
