@@ -48,7 +48,17 @@
     binding_get_all_variables/1,
     binding_to_scope/1,
     capture_closure_bindings/2,
-    flatten_bindings/1
+    flatten_bindings/1,
+    % 名前空間管理
+    new_namespace/0,
+    new_namespace/1,
+    new_namespace/2,
+    bind_constant/3,
+    lookup_constant/2,
+    lookup_constant_path/2,
+    get_constants/1,
+    set_nesting/2,
+    get_nesting/1
 ]).
 
 %% ============================================================================
@@ -78,7 +88,17 @@
     captured_bindings := #{atom() => term()}  % フラット化された全変数の束縛
 }.
 
--export_type([scope/0, scope_stack/0, binding/0]).
+%% @doc 名前空間の型定義
+%% 名前空間はRubyの定数を管理する
+%% クラス、モジュール、トップレベルなど、各スコープが独自の名前空間を持つ
+-type namespace() :: #{
+    name := atom() | nil,                    % 名前空間の名前（nilはトップレベル）
+    constants := #{atom() => term()},        % 定数名 -> 値のマッピング
+    parent := namespace() | nil,             % 親名前空間（継承チェーン）
+    nesting := [atom()]                      % ネスト情報（A::B::Cの場合は[A, B, C]）
+}.
+
+-export_type([scope/0, scope_stack/0, binding/0, namespace/0]).
 
 %% ============================================================================
 %% スコープ生成と破棄
@@ -585,3 +605,275 @@ flatten_bindings_recursive(Scope, Acc) when is_map(Scope) ->
     % 現在のスコープの変数で上書き（子スコープの値が優先）
     CurrentBindings = maps:get(bindings, Scope),
     maps:merge(AccWithParent, CurrentBindings).
+
+%% ============================================================================
+%% 名前空間管理
+%% ============================================================================
+
+%% @doc 新しいトップレベル名前空間を作成
+%%
+%% 親名前空間を持たないルート名前空間を生成します。
+%% Rubyのトップレベル（::Object）の名前空間として使用します。
+%%
+%% 戻り値：
+%%   - 空の定数テーブルと親名前空間nil を持つ新しい名前空間
+%%
+%% 使用例：
+%% ```
+%% TopLevel = ruby_scope:new_namespace(),
+%% % #{name => nil, constants => #{}, parent => nil, nesting => []}
+%% '''
+-spec new_namespace() -> namespace().
+new_namespace() ->
+    #{
+        name => nil,
+        constants => #{},
+        parent => nil,
+        nesting => []
+    }.
+
+%% @doc 親名前空間を指定して新しい名前空間を作成
+%%
+%% 指定された親名前空間を持つ子名前空間を生成します。
+%% クラスやモジュールの名前空間を作成する際に使用します。
+%%
+%% パラメータ：
+%%   - ParentNamespace: 親となる名前空間
+%%
+%% 戻り値：
+%%   - 空の定数テーブルと指定された親名前空間を持つ新しい名前空間
+%%
+%% 使用例：
+%% ```
+%% TopLevel = ruby_scope:new_namespace(),
+%% ClassNS = ruby_scope:new_namespace(TopLevel),
+%% % #{name => nil, constants => #{}, parent => TopLevel, nesting => []}
+%% '''
+-spec new_namespace(namespace()) -> namespace().
+new_namespace(ParentNamespace) when is_map(ParentNamespace) ->
+    #{
+        name => nil,
+        constants => #{},
+        parent => ParentNamespace,
+        nesting => []
+    }.
+
+%% @doc 名前と親名前空間を指定して新しい名前空間を作成
+%%
+%% 指定された名前と親名前空間を持つ名前空間を生成します。
+%% クラスやモジュールの名前空間を作成する際に使用します。
+%%
+%% パラメータ：
+%%   - Name: 名前空間の名前（atom型）
+%%   - ParentNamespace: 親となる名前空間
+%%
+%% 戻り値：
+%%   - 指定された名前と親名前空間を持つ新しい名前空間
+%%
+%% 使用例：
+%% ```
+%% TopLevel = ruby_scope:new_namespace(),
+%% MyClassNS = ruby_scope:new_namespace('MyClass', TopLevel),
+%% % #{name => 'MyClass', constants => #{}, parent => TopLevel, nesting => ['MyClass']}
+%% '''
+-spec new_namespace(atom(), namespace()) -> namespace().
+new_namespace(Name, ParentNamespace) when is_atom(Name), is_map(ParentNamespace) ->
+    % 親のネスティング情報を取得して、自分の名前を追加
+    ParentNesting = maps:get(nesting, ParentNamespace),
+    NewNesting = ParentNesting ++ [Name],
+    #{
+        name => Name,
+        constants => #{},
+        parent => ParentNamespace,
+        nesting => NewNesting
+    }.
+
+%% @doc 名前空間に定数を束縛
+%%
+%% 指定された定数名に値を束縛した新しい名前空間を返します。
+%% 既存の定数が存在する場合は上書きされます（Rubyでは警告が出る）。
+%% 元の名前空間は変更されず、新しい名前空間が返されます。
+%%
+%% パラメータ：
+%%   - Name: 定数名（atom型、大文字で始まる）
+%%   - Value: 束縛する値（任意の型）
+%%   - Namespace: 対象の名前空間
+%%
+%% 戻り値：
+%%   - 定数が束縛された新しい名前空間
+%%
+%% 使用例：
+%% ```
+%% NS1 = ruby_scope:new_namespace(),
+%% NS2 = ruby_scope:bind_constant('FOO', 42, NS1),
+%% NS3 = ruby_scope:bind_constant('BAR', "hello", NS2),
+%% % NS3には FOO => 42, BAR => "hello" が束縛されている
+%% '''
+-spec bind_constant(atom(), term(), namespace()) -> namespace().
+bind_constant(Name, Value, Namespace) when is_atom(Name), is_map(Namespace) ->
+    Constants = maps:get(constants, Namespace),
+    NewConstants = maps:put(Name, Value, Constants),
+    maps:put(constants, NewConstants, Namespace).
+
+%% @doc 名前空間チェーンを辿って定数を検索
+%%
+%% 現在の名前空間から開始し、見つからなければ親名前空間を順に検索します。
+%% Rubyの定数検索ルールを実装するための中核機能です。
+%%
+%% パラメータ：
+%%   - Name: 検索する定数名（atom型）
+%%   - Namespace: 検索を開始する名前空間
+%%
+%% 戻り値：
+%%   - {ok, Value}: 定数が見つかった場合、その値を返す
+%%   - {error, undefined}: 定数が見つからなかった場合
+%%
+%% 使用例：
+%% ```
+%% TopLevel1 = ruby_scope:new_namespace(),
+%% TopLevel2 = ruby_scope:bind_constant('PI', 3.14, TopLevel1),
+%% ClassNS1 = ruby_scope:new_namespace('MyClass', TopLevel2),
+%% ClassNS2 = ruby_scope:bind_constant('VERSION', "1.0", ClassNS1),
+%%
+%% {ok, 3.14} = ruby_scope:lookup_constant('PI', ClassNS2),      % 親から検索
+%% {ok, "1.0"} = ruby_scope:lookup_constant('VERSION', ClassNS2), % 現在から検索
+%% {error, undefined} = ruby_scope:lookup_constant('UNKNOWN', ClassNS2).
+%% '''
+-spec lookup_constant(atom(), namespace()) -> {ok, term()} | {error, undefined}.
+lookup_constant(Name, Namespace) when is_atom(Name), is_map(Namespace) ->
+    Constants = maps:get(constants, Namespace),
+    case maps:find(Name, Constants) of
+        {ok, Value} ->
+            {ok, Value};
+        error ->
+            % 親名前空間を検索
+            case maps:get(parent, Namespace) of
+                nil ->
+                    {error, undefined};
+                ParentNamespace ->
+                    lookup_constant(Name, ParentNamespace)
+            end
+    end.
+
+%% @doc ネストした定数パスを解決
+%%
+%% A::B::C のような階層的な定数アクセスを解決します。
+%% パスは定数名のリストとして渡されます（例：[A, B, C]）。
+%%
+%% パラメータ：
+%%   - Path: 定数名のリスト（[atom()]、例：['Foo', 'Bar', 'Baz']）
+%%   - Namespace: 検索を開始する名前空間
+%%
+%% 戻り値：
+%%   - {ok, Value}: 定数パスが解決された場合、最終的な値を返す
+%%   - {error, {undefined_constant, ConstName}}: 定数が見つからなかった場合
+%%
+%% 使用例：
+%% ```
+%% % A::B::C を解決
+%% TopLevel = ruby_scope:new_namespace(),
+%% % A モジュールを定義
+%% ANS = ruby_scope:new_namespace('A', TopLevel),
+%% TopLevel2 = ruby_scope:bind_constant('A', ANS, TopLevel),
+%% % A::B モジュールを定義
+%% BNS = ruby_scope:new_namespace('B', ANS),
+%% ANS2 = ruby_scope:bind_constant('B', BNS, ANS),
+%% % A::B::C 定数を定義
+%% BNS2 = ruby_scope:bind_constant('C', 42, BNS),
+%%
+%% % A::B::C を解決
+%% {ok, 42} = ruby_scope:lookup_constant_path(['A', 'B', 'C'], TopLevel2).
+%% '''
+-spec lookup_constant_path([atom()], namespace()) -> {ok, term()} | {error, {undefined_constant, atom()}}.
+lookup_constant_path([], _Namespace) ->
+    {error, {undefined_constant, nil}};
+lookup_constant_path([Name], Namespace) ->
+    case lookup_constant(Name, Namespace) of
+        {ok, Value} -> {ok, Value};
+        {error, undefined} -> {error, {undefined_constant, Name}}
+    end;
+lookup_constant_path([Name | Rest], Namespace) ->
+    case lookup_constant(Name, Namespace) of
+        {ok, Value} when is_map(Value) ->
+            % 次の定数を検索（Valueは名前空間であるべき）
+            case maps:is_key(constants, Value) of
+                true ->
+                    % Value は名前空間
+                    lookup_constant_path(Rest, Value);
+                false ->
+                    % Value は名前空間ではない
+                    {error, {undefined_constant, Name}}
+            end;
+        {ok, _Value} ->
+            % 定数は見つかったが、名前空間ではない
+            {error, {undefined_constant, Name}};
+        {error, undefined} ->
+            {error, {undefined_constant, Name}}
+    end.
+
+%% @doc 名前空間内の全定数を取得
+%%
+%% 名前空間に保存されている全ての定数名と値のマップを返します。
+%% 現在の名前空間のみの定数を返し、親名前空間の定数は含みません。
+%%
+%% パラメータ：
+%%   - Namespace: 対象の名前空間
+%%
+%% 戻り値：
+%%   - 定数名から値へのマップ（#{atom() => term()}）
+%%
+%% 使用例：
+%% ```
+%% NS1 = ruby_scope:new_namespace(),
+%% NS2 = ruby_scope:bind_constant('FOO', 42, NS1),
+%% NS3 = ruby_scope:bind_constant('BAR', "hello", NS2),
+%% Constants = ruby_scope:get_constants(NS3),
+%% % #{FOO => 42, BAR => "hello"}
+%% '''
+-spec get_constants(namespace()) -> #{atom() => term()}.
+get_constants(Namespace) when is_map(Namespace) ->
+    maps:get(constants, Namespace).
+
+%% @doc 名前空間のネスト情報を設定
+%%
+%% 名前空間のネスト情報（A::B::Cの場合は[A, B, C]）を設定します。
+%% モジュールやクラスの定義時にネスト構造を記録する際に使用します。
+%%
+%% パラメータ：
+%%   - Nesting: ネスト情報のリスト（[atom()]）
+%%   - Namespace: 対象の名前空間
+%%
+%% 戻り値：
+%%   - ネスト情報が設定された新しい名前空間
+%%
+%% 使用例：
+%% ```
+%% NS = ruby_scope:new_namespace(),
+%% NS2 = ruby_scope:set_nesting(['Foo', 'Bar'], NS),
+%% % NS2のネスト情報は['Foo', 'Bar']
+%% '''
+-spec set_nesting([atom()], namespace()) -> namespace().
+set_nesting(Nesting, Namespace) when is_list(Nesting), is_map(Namespace) ->
+    maps:put(nesting, Nesting, Namespace).
+
+%% @doc 名前空間のネスト情報を取得
+%%
+%% 名前空間のネスト情報を取得します。
+%% トップレベル名前空間の場合は空のリストを返します。
+%%
+%% パラメータ：
+%%   - Namespace: 対象の名前空間
+%%
+%% 戻り値：
+%%   - ネスト情報のリスト（[atom()]）
+%%
+%% 使用例：
+%% ```
+%% TopLevel = ruby_scope:new_namespace(),
+%% [] = ruby_scope:get_nesting(TopLevel),
+%% ClassNS = ruby_scope:new_namespace('MyClass', TopLevel),
+%% ['MyClass'] = ruby_scope:get_nesting(ClassNS).
+%% '''
+-spec get_nesting(namespace()) -> [atom()].
+get_nesting(Namespace) when is_map(Namespace) ->
+    maps:get(nesting, Namespace).

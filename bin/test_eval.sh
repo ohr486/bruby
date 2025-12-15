@@ -51,8 +51,61 @@ lists:foreach(fun({Num, Name, Code}) ->
     timer:sleep(100)
 end, Demos),
 
-io:format("~n=== Test completed ===~n"),
+io:format("~n=== Namespace Management Demo ===~n"),
+io:format("~nThe ruby_scope module now supports namespace management for constants.~n"),
+io:format("This is the foundation for Ruby constant resolution (A::B::C).~n~n"),
+
+% 名前空間のデモ
+io:format("Demo 1: Creating top-level namespace~n"),
+TopLevel = ruby_scope:new_namespace(),
+io:format("  TopLevel = ruby_scope:new_namespace()~n"),
+io:format("  Result: ~p~n~n", [TopLevel]),
+
+io:format("Demo 2: Binding a constant~n"),
+PI_Atom = list_to_atom("PI"),
+NS1 = ruby_scope:bind_constant(PI_Atom, 3.14159, TopLevel),
+io:format("  NS1 = ruby_scope:bind_constant(~p, 3.14159, TopLevel)~n", [PI_Atom]),
+{ok, PIValue} = ruby_scope:lookup_constant(PI_Atom, NS1),
+io:format("  {ok, ~p} = ruby_scope:lookup_constant(~p, NS1)~n~n", [PIValue, PI_Atom]),
+
+io:format("Demo 3: Creating nested namespaces (A::B::C)~n"),
+% A namespace
+A_Atom = list_to_atom("A"),
+ANS = ruby_scope:new_namespace(A_Atom, NS1),
+NS2 = ruby_scope:bind_constant(A_Atom, ANS, NS1),
+io:format("  Created namespace A~n"),
+
+% A::B namespace
+B_Atom = list_to_atom("B"),
+BNS = ruby_scope:new_namespace(B_Atom, ANS),
+ANS2 = ruby_scope:bind_constant(B_Atom, BNS, ANS),
+NS3 = ruby_scope:bind_constant(A_Atom, ANS2, NS2),
+io:format("  Created namespace A::B~n"),
+
+% A::B::VALUE constant
+VALUE_Atom = list_to_atom("VALUE"),
+BNS2 = ruby_scope:bind_constant(VALUE_Atom, 42, BNS),
+ANS3 = ruby_scope:bind_constant(B_Atom, BNS2, ANS2),
+NS4 = ruby_scope:bind_constant(A_Atom, ANS3, NS3),
+io:format("  Bound constant A::B::VALUE = 42~n"),
+
+% Lookup nested constant
+{ok, ConstValue} = ruby_scope:lookup_constant_path([A_Atom, B_Atom, VALUE_Atom], NS4),
+io:format("  {ok, ~p} = ruby_scope:lookup_constant_path([~p, ~p, ~p], NS4)~n~n", [ConstValue, A_Atom, B_Atom, VALUE_Atom]),
+
+io:format("Demo 4: Nesting information~n"),
+Nesting = ruby_scope:get_nesting(BNS2),
+io:format("  Nesting of A::B namespace: ~p~n~n", [Nesting]),
+
+io:format("~n=== Evaluator Test completed ===~n"),
 io:format("To try your own code, use:~n"),
 io:format("  erl -pa lib/ruby/ebin~n"),
-io:format("  ruby_evaluator:eval_string(\"your code here\").~n~n")
+io:format("  ruby_evaluator:eval_string(\"your code here\").~n"),
+io:format("~nFor namespace operations:~n"),
+io:format("  ruby_scope:new_namespace()~n"),
+NameAtom = list_to_atom("Name"),
+io:format("  ruby_scope:bind_constant(~p, Value, Namespace)~n", [NameAtom]),
+io:format("  ruby_scope:lookup_constant(~p, Namespace)~n", [NameAtom]),
+ABC_Atoms = [list_to_atom("A"), list_to_atom("B"), list_to_atom("C")],
+io:format("  ruby_scope:lookup_constant_path(~p, Namespace)~n~n", [ABC_Atoms])
 ' -s init stop

@@ -4,7 +4,7 @@
 test() ->
   io:format("~n=== Running Scope Tests ===~n"),
 
-  % テスト実行
+  % 変数スコープのテスト
   test_new_scope(),
   test_new_scope_with_parent(),
   test_bind_and_lookup(),
@@ -18,6 +18,19 @@ test() ->
   test_scope_stack_current(),
   test_scope_chain(),
   test_shadowing(),
+
+  % 名前空間のテスト
+  test_new_namespace(),
+  test_new_namespace_with_parent(),
+  test_new_namespace_with_name(),
+  test_bind_constant(),
+  test_lookup_constant(),
+  test_lookup_constant_in_parent(),
+  test_lookup_constant_not_found(),
+  test_lookup_constant_path(),
+  test_lookup_constant_path_nested(),
+  test_get_constants(),
+  test_nesting(),
 
   io:format("~n=== All Scope Tests Passed ===~n"),
   ok.
@@ -204,4 +217,148 @@ test_shadowing() ->
   % 親スコープでは親の値がそのまま
   {ok, ParentVal} = ruby_scope:lookup(x, ParentScope2),
   assert_equal(100, ParentVal, "parent scope retains original value"),
+  ok.
+
+%% ============================================================================
+%% 名前空間のテスト
+%% ============================================================================
+
+%% 新しい名前空間の作成
+test_new_namespace() ->
+  Namespace = ruby_scope:new_namespace(),
+  assert_equal(nil, maps:get(name, Namespace), "new namespace has no name"),
+  assert_equal(#{}, ruby_scope:get_constants(Namespace), "new namespace has empty constants"),
+  assert_equal(nil, maps:get(parent, Namespace), "new namespace has no parent"),
+  assert_equal([], ruby_scope:get_nesting(Namespace), "new namespace has empty nesting"),
+  ok.
+
+%% 親名前空間を持つ名前空間の作成
+test_new_namespace_with_parent() ->
+  ParentNS = ruby_scope:new_namespace(),
+  ChildNS = ruby_scope:new_namespace(ParentNS),
+  assert_equal(nil, maps:get(name, ChildNS), "child namespace has no name"),
+  assert_equal(#{}, ruby_scope:get_constants(ChildNS), "child namespace has empty constants"),
+  assert_equal(ParentNS, maps:get(parent, ChildNS), "child namespace has parent"),
+  ok.
+
+%% 名前を持つ名前空間の作成
+test_new_namespace_with_name() ->
+  ParentNS = ruby_scope:new_namespace(),
+  MyClassNS = ruby_scope:new_namespace('MyClass', ParentNS),
+  assert_equal('MyClass', maps:get(name, MyClassNS), "namespace has name"),
+  assert_equal(ParentNS, maps:get(parent, MyClassNS), "namespace has parent"),
+  assert_equal(['MyClass'], ruby_scope:get_nesting(MyClassNS), "namespace has correct nesting"),
+  ok.
+
+%% 定数の束縛
+test_bind_constant() ->
+  NS1 = ruby_scope:new_namespace(),
+  NS2 = ruby_scope:bind_constant('FOO', 42, NS1),
+  Constants = ruby_scope:get_constants(NS2),
+  assert_equal(#{'FOO' => 42}, Constants, "bind constant"),
+  ok.
+
+%% 定数の検索
+test_lookup_constant() ->
+  NS1 = ruby_scope:new_namespace(),
+  NS2 = ruby_scope:bind_constant('PI', 3.14, NS1),
+  {ok, Value} = ruby_scope:lookup_constant('PI', NS2),
+  assert_equal(3.14, Value, "lookup constant"),
+  ok.
+
+%% 親名前空間での定数検索
+test_lookup_constant_in_parent() ->
+  ParentNS1 = ruby_scope:new_namespace(),
+  ParentNS2 = ruby_scope:bind_constant('GLOBAL_CONST', 100, ParentNS1),
+
+  ChildNS1 = ruby_scope:new_namespace('MyClass', ParentNS2),
+  ChildNS2 = ruby_scope:bind_constant('LOCAL_CONST', 200, ChildNS1),
+
+  {ok, GlobalVal} = ruby_scope:lookup_constant('GLOBAL_CONST', ChildNS2),
+  assert_equal(100, GlobalVal, "lookup constant in parent namespace"),
+
+  {ok, LocalVal} = ruby_scope:lookup_constant('LOCAL_CONST', ChildNS2),
+  assert_equal(200, LocalVal, "lookup constant in current namespace"),
+  ok.
+
+%% 定数が見つからない場合
+test_lookup_constant_not_found() ->
+  NS = ruby_scope:new_namespace(),
+  Result = ruby_scope:lookup_constant('UNDEFINED_CONST', NS),
+  assert_equal({error, undefined}, Result, "lookup undefined constant"),
+  ok.
+
+%% 単純な定数パスの解決
+test_lookup_constant_path() ->
+  TopLevel = ruby_scope:new_namespace(),
+
+  % A モジュールを定義
+  ANS1 = ruby_scope:new_namespace('A', TopLevel),
+  ANS2 = ruby_scope:bind_constant('VALUE', 42, ANS1),
+  TopLevel2 = ruby_scope:bind_constant('A', ANS2, TopLevel),
+
+  % A::VALUE を解決
+  {ok, Value} = ruby_scope:lookup_constant_path(['A', 'VALUE'], TopLevel2),
+  assert_equal(42, Value, "lookup constant path A::VALUE"),
+  ok.
+
+%% ネストした定数パスの解決
+test_lookup_constant_path_nested() ->
+  TopLevel = ruby_scope:new_namespace(),
+
+  % A モジュールを定義
+  ANS = ruby_scope:new_namespace('A', TopLevel),
+  TopLevel2 = ruby_scope:bind_constant('A', ANS, TopLevel),
+
+  % A::B モジュールを定義
+  BNS = ruby_scope:new_namespace('B', ANS),
+  ANS2 = ruby_scope:bind_constant('B', BNS, ANS),
+  TopLevel3 = ruby_scope:bind_constant('A', ANS2, TopLevel2),
+
+  % A::B::C 定数を定義
+  BNS2 = ruby_scope:bind_constant('C', 999, BNS),
+  ANS3 = ruby_scope:bind_constant('B', BNS2, ANS2),
+  TopLevel4 = ruby_scope:bind_constant('A', ANS3, TopLevel3),
+
+  % A::B::C を解決
+  {ok, Value} = ruby_scope:lookup_constant_path(['A', 'B', 'C'], TopLevel4),
+  assert_equal(999, Value, "lookup nested constant path A::B::C"),
+
+  % 存在しないパス
+  Result = ruby_scope:lookup_constant_path(['A', 'B', 'D'], TopLevel4),
+  assert_equal({error, {undefined_constant, 'D'}}, Result, "lookup undefined nested constant"),
+  ok.
+
+%% 定数一覧の取得
+test_get_constants() ->
+  NS1 = ruby_scope:new_namespace(),
+  NS2 = ruby_scope:bind_constant('FOO', 42, NS1),
+  NS3 = ruby_scope:bind_constant('BAR', "hello", NS2),
+  NS4 = ruby_scope:bind_constant('BAZ', true, NS3),
+
+  Constants = ruby_scope:get_constants(NS4),
+  assert_equal(#{'FOO' => 42, 'BAR' => "hello", 'BAZ' => true}, Constants, "get all constants"),
+  ok.
+
+%% ネスト情報のテスト
+test_nesting() ->
+  TopLevel = ruby_scope:new_namespace(),
+  assert_equal([], ruby_scope:get_nesting(TopLevel), "top level has empty nesting"),
+
+  % A モジュール
+  ANS = ruby_scope:new_namespace('A', TopLevel),
+  assert_equal(['A'], ruby_scope:get_nesting(ANS), "A module has [A] nesting"),
+
+  % A::B モジュール
+  BNS = ruby_scope:new_namespace('B', ANS),
+  assert_equal(['A', 'B'], ruby_scope:get_nesting(BNS), "A::B module has [A, B] nesting"),
+
+  % A::B::C モジュール
+  CNS = ruby_scope:new_namespace('C', BNS),
+  assert_equal(['A', 'B', 'C'], ruby_scope:get_nesting(CNS), "A::B::C module has [A, B, C] nesting"),
+
+  % set_nesting のテスト
+  NS = ruby_scope:new_namespace(),
+  NS2 = ruby_scope:set_nesting(['Foo', 'Bar'], NS),
+  assert_equal(['Foo', 'Bar'], ruby_scope:get_nesting(NS2), "set_nesting works"),
   ok.
