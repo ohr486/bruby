@@ -193,13 +193,13 @@
   - [ ] マッチング (=~, match, scan)
 
 #### メソッド実装
-- [ ] Kernelモジュール (lib/ruby/src/builtin/ruby_kernel.erl)
-  - [ ] 出力メソッド (puts, print, p, printf)
-  - [ ] 入力メソッド (gets, readline)
-  - [ ] 型変換メソッド (Integer, Float, String, Array)
-  - [ ] オブジェクト検査 (class, is_a?, kind_of?, respond_to?)
-  - [ ] ファイル読み込み (require, load, require_relative)
-  - [ ] 例外処理 (raise, fail, catch, throw)
+- [x] Kernelモジュール (lib/ruby/src/builtin/ruby_kernel.erl)
+  - [x] 出力メソッド (puts, print, p, printf)
+  - [x] 入力メソッド (gets, readline)
+  - [x] 型変換メソッド (Integer, Float, String, Array)
+  - [x] オブジェクト検査 (class, is_a?, kind_of?, respond_to?)
+  - [x] ファイル読み込み (require, load, require_relative) ※基本実装
+  - [x] 例外処理 (raise, fail, catch, throw) ※基本実装
 - [ ] Enumerableモジュール (lib/ruby/src/builtin/ruby_enumerable.erl)
   - [ ] イテレーション (each, each_with_index)
   - [ ] 変換 (map, collect, flat_map)

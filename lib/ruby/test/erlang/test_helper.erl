@@ -17,6 +17,7 @@ test() ->
     test_value:test(),
     test_object:test(),
     test_numeric:test(),
+    test_kernel:test(),
     success
   catch
     Error:Reason:Stacktrace ->

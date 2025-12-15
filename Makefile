@@ -182,6 +182,7 @@ lint: compile
 	$(Q) echo ===== running lint checks
 	$(Q) echo "Checking ruby application..."
 	$(ERLC) $(LINT_OPTS) -I lib/ruby/src -o /tmp lib/ruby/src/*.erl || true
+	$(ERLC) $(LINT_OPTS) -I lib/ruby/src -o /tmp lib/ruby/src/builtin/*.erl || true
 	$(Q) echo "Checking irb application..."
 	$(ERLC) $(LINT_OPTS) -I lib/irb/src -o /tmp lib/irb/src/*.erl || true
 	$(Q) echo "Checking epmd application..."
