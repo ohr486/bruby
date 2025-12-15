@@ -18,6 +18,7 @@ test() ->
     test_object:test(),
     test_numeric:test(),
     test_kernel:test(),
+    test_string:test(),
     success
   catch
     Error:Reason:Stacktrace ->

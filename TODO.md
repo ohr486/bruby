@@ -167,11 +167,11 @@
   - [x] Floatクラスの基本メソッド
   - [x] Numericクラスの共通メソッド
   - [x] 型変換メソッド (to_i, to_f, to_s)
-- [ ] 文字列クラス (lib/ruby/src/builtin/ruby_string.erl)
-  - [ ] 文字列の結合・分割 (+, <<, split, chars)
-  - [ ] 文字列の検索・置換 (index, gsub, sub)
-  - [ ] 文字列の変換 (upcase, downcase, capitalize)
-  - [ ] 文字列のフォーマット (%, format)
+- [x] 文字列クラス (lib/ruby/src/builtin/ruby_string.erl)
+  - [x] 文字列の結合・分割 (+, <<, split, chars)
+  - [x] 文字列の検索・置換 (index, gsub, sub)
+  - [x] 文字列の変換 (upcase, downcase, capitalize)
+  - [ ] 文字列のフォーマット (%, format) ※将来実装
 - [ ] シンボルクラス (lib/ruby/src/builtin/ruby_symbol.erl)
   - [ ] シンボルの生成と管理
   - [ ] シンボルテーブル（アトムの活用）
