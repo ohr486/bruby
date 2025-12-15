@@ -458,5 +458,117 @@ io:format("  ruby_integer:to_string(42, 16)~n"),
 io:format("  ruby_integer:times(5, Fun)~n"),
 io:format("  ruby_float:add(3.5, 4.0)~n"),
 io:format("  ruby_float:round(42.345, 2)~n"),
-io:format("  ruby_float:ceil(42.3)~n~n")
+io:format("  ruby_float:ceil(42.3)~n~n"),
+
+io:format("~n=== Kernel Module Demo ===~n"),
+io:format("~nThe ruby_kernel module provides built-in methods for Ruby Kernel module.~n"),
+io:format("Kernel is mixed into Object, so its methods are available in every Ruby object.~n~n"),
+
+% 出力メソッドのデモ
+io:format("Demo 1: Output methods~n"),
+io:format("  ruby_kernel:puts(42):~n    "),
+ruby_kernel:puts(42),
+io:format("  ruby_kernel:print(\\\"Hello \\\"):~n    "),
+ruby_kernel:print("Hello "),
+ruby_kernel:print("World"),
+io:format("~n"),
+io:format("  ruby_kernel:p(\\\"test\\\"):~n    "),
+PResult = ruby_kernel:p("test"),
+io:format("    (returns: ~p)~n", [PResult]),
+io:format("  ruby_kernel:printf(\\\"Number: ~~p~~n\\\", [100]):~n    "),
+ruby_kernel:printf("Number: ~p~n", [100]),
+io:format("~n"),
+
+% 型変換メソッドのデモ
+io:format("Demo 2: Type conversion methods~n"),
+{ok, KInt1} = ruby_kernel:to_integer("42"),
+io:format("  ruby_kernel:to_integer(\\\"42\\\") = {ok, ~p}~n", [KInt1]),
+{ok, KFloat1} = ruby_kernel:to_float("3.14"),
+io:format("  ruby_kernel:to_float(\\\"3.14\\\") = {ok, ~p}~n", [KFloat1]),
+{ok, KStr1} = ruby_kernel:to_string(123),
+io:format("  ruby_kernel:to_string(123) = {ok, \\\"~s\\\"}~n", [KStr1]),
+KArr1 = ruby_kernel:to_array(42),
+io:format("  ruby_kernel:to_array(42) = ~p~n~n", [KArr1]),
+
+% オブジェクト検査メソッドのデモ
+io:format("Demo 3: Object inspection methods~n"),
+KClass1 = ruby_kernel:get_class(42),
+io:format("  ruby_kernel:get_class(42) = ~p~n", [KClass1]),
+KClass2 = ruby_kernel:get_class(3.14),
+io:format("  ruby_kernel:get_class(3.14) = ~p~n", [KClass2]),
+KClass3 = ruby_kernel:get_class("hello"),
+io:format("  ruby_kernel:get_class(\\\"hello\\\") = ~p~n", [KClass3]),
+KClass4 = ruby_kernel:get_class(nil),
+io:format("  ruby_kernel:get_class(nil) = ~p~n", [KClass4]),
+KClass5 = ruby_kernel:get_class(true),
+io:format("  ruby_kernel:get_class(true) = ~p~n~n", [KClass5]),
+
+% is_a? のデモ
+IntegerAtom = list_to_atom("Integer"),
+FloatAtom = list_to_atom("Float"),
+StringAtom = list_to_atom("String"),
+io:format("Demo 4: is_a? method~n"),
+KIsA1 = ruby_kernel:is_a(42, IntegerAtom),
+io:format("  ruby_kernel:is_a(42, 'Integer') = ~p~n", [KIsA1]),
+KIsA2 = ruby_kernel:is_a(42, FloatAtom),
+io:format("  ruby_kernel:is_a(42, 'Float') = ~p~n", [KIsA2]),
+KIsA3 = ruby_kernel:is_a("hello", StringAtom),
+io:format("  ruby_kernel:is_a(\\\"hello\\\", 'String') = ~p~n~n", [KIsA3]),
+
+% is_a? with inheritance
+VehicleAtom = list_to_atom("Vehicle"),
+CarAtom = list_to_atom("Car"),
+ok = ruby_object_server:register_class(VehicleAtom, nil),
+ok = ruby_object_server:register_class(CarAtom, VehicleAtom),
+{ok, CarObj} = ruby_object_server:new_instance(CarAtom),
+KIsA4 = ruby_kernel:is_a(CarObj, CarAtom),
+KIsA5 = ruby_kernel:is_a(CarObj, VehicleAtom),
+io:format("  With inheritance:~n"),
+io:format("    car_obj.is_a?('Car') = ~p~n", [KIsA4]),
+io:format("    car_obj.is_a?('Vehicle') = ~p  (parent class)~n~n", [KIsA5]),
+
+% respond_to? のデモ
+io:format("Demo 5: respond_to? method~n"),
+ok = ruby_object_server:define_class_method(
+    CarAtom,
+    drive,
+    #{name => drive, params => [], body => "Driving...", closure_env => nil}
+),
+KResponds1 = ruby_kernel:respond_to(CarObj, drive),
+KResponds2 = ruby_kernel:respond_to(CarObj, fly),
+io:format("  car_obj.respond_to?(:drive) = ~p~n", [KResponds1]),
+io:format("  car_obj.respond_to?(:fly) = ~p~n~n", [KResponds2]),
+
+% 例外メソッドのデモ
+RuntimeErrorAtom = list_to_atom("RuntimeError"),
+io:format("Demo 6: Exception methods~n"),
+KRaise1 = ruby_kernel:raise("Error message"),
+io:format("  ruby_kernel:raise(\\\"Error message\\\") = ~p~n", [KRaise1]),
+KRaise2 = ruby_kernel:raise(RuntimeErrorAtom, "Runtime error"),
+io:format("  ruby_kernel:raise('RuntimeError', \\\"Runtime error\\\") = ~p~n~n", [KRaise2]),
+
+% catch/throw のデモ
+io:format("Demo 7: catch/throw~n"),
+KCatch1 = ruby_kernel:catch_throw(fun() -> ruby_kernel:throw(42) end),
+io:format("  catch_throw(fun() -> throw(42) end) = ~p~n", [KCatch1]),
+KCatch2 = ruby_kernel:catch_throw(fun() -> ruby_kernel:throw(symbol, "value") end),
+io:format("  catch_throw(fun() -> throw(symbol, \\\"value\\\") end) = ~p~n", [KCatch2]),
+KCatch3 = ruby_kernel:catch_throw(fun() -> 99 end),
+io:format("  catch_throw(fun() -> 99 end) = ~p  (no throw)~n~n", [KCatch3]),
+
+io:format("~nFor Kernel module operations:~n"),
+io:format("  ruby_kernel:puts(\\\"text\\\")~n"),
+io:format("  ruby_kernel:print(\\\"text\\\")~n"),
+io:format("  ruby_kernel:p(value)~n"),
+io:format("  ruby_kernel:printf(\\\"format\\\", [args])~n"),
+io:format("  ruby_kernel:to_integer(\\\"42\\\")~n"),
+io:format("  ruby_kernel:to_float(\\\"3.14\\\")~n"),
+io:format("  ruby_kernel:to_string(123)~n"),
+io:format("  ruby_kernel:to_array(value)~n"),
+io:format("  ruby_kernel:get_class(value)~n"),
+io:format("  ruby_kernel:is_a(obj, 'ClassName')~n"),
+io:format("  ruby_kernel:kind_of(obj, 'ClassName')~n"),
+io:format("  ruby_kernel:respond_to(obj, method_name)~n"),
+io:format("  ruby_kernel:raise(\\\"message\\\")~n"),
+io:format("  ruby_kernel:catch_throw(fun)~n~n")
 ' -s init stop

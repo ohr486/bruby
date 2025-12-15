@@ -395,6 +395,297 @@ BNS2 = ruby_scope:bind_constant('C', 42, BNS),
 
 定数検索は現在の名前空間から開始し、見つからなければ親名前空間を順に辿ります。これにより、Rubyの定数検索ルールを実装しています。
 
+### Kernelモジュール（builtin/ruby_kernel.erl）
+
+brubyはKernelモジュールの主要メソッドを実装しています。KernelはObjectにミックスインされるため、すべてのRubyオブジェクトでこれらのメソッドが利用可能です。
+
+#### 出力メソッド
+
+**puts - 引数を出力して改行を追加：**
+```erlang
+% 整数の出力
+ruby_kernel:puts(42).
+% => 42
+% （改行あり）
+
+% 文字列の出力
+ruby_kernel:puts("Hello, World!").
+% => Hello, World!
+% （改行あり）
+
+% nilの出力
+ruby_kernel:puts(nil).
+% => （空行）
+
+% true/falseの出力
+ruby_kernel:puts(true).
+% => true
+
+% すべてnilを返す
+nil = ruby_kernel:puts(42).
+```
+
+**print - 引数を出力（改行なし）：**
+```erlang
+% 改行なしで出力
+ruby_kernel:print("Hello").
+ruby_kernel:print(" ").
+ruby_kernel:print("World").
+% => Hello World（改行なし）
+
+% nilを返す
+nil = ruby_kernel:print("test").
+```
+
+**p - inspect表現を出力して値を返す：**
+```erlang
+% デバッグ用に値を表示
+Result = ruby_kernel:p(42).
+% => 42（改行あり）
+% Resultには42が代入される
+
+% 文字列はクォート付きで表示
+ruby_kernel:p("hello").
+% => "hello"
+```
+
+**printf - フォーマット文字列で出力：**
+```erlang
+% フォーマット付き出力
+ruby_kernel:printf("Number: ~p, String: ~s~n", [42, "hello"]).
+% => Number: 42, String: hello
+
+% nilを返す
+nil = ruby_kernel:printf("Value: ~p~n", [100]).
+```
+
+#### 入力メソッド
+
+**gets - 標準入力から1行読み込み：**
+```erlang
+% 1行読み込み（改行を含む）
+Line = ruby_kernel:gets().
+% ユーザーが "hello" を入力した場合
+% Line = "hello\n"
+
+% EOFの場合はnilを返す
+nil = ruby_kernel:gets().  % EOF時
+```
+
+**readline - 標準入力から1行読み込み（EOFでエラー）：**
+```erlang
+% 1行読み込み（末尾の改行を削除）
+Line = ruby_kernel:readline().
+% ユーザーが "hello" を入力した場合
+% Line = "hello"
+
+% EOFの場合はエラーを返す
+{error, eof} = ruby_kernel:readline().  % EOF時
+```
+
+#### 型変換メソッド
+
+**Integer - 整数に変換：**
+```erlang
+% 文字列から整数へ
+{ok, 42} = ruby_kernel:to_integer("42").
+
+% 浮動小数点数から整数へ（切り捨て）
+{ok, 42} = ruby_kernel:to_integer(42.7).
+
+% 整数から整数へ（そのまま）
+{ok, 100} = ruby_kernel:to_integer(100).
+```
+
+**Float - 浮動小数点数に変換：**
+```erlang
+% 文字列から浮動小数点数へ
+{ok, 3.14} = ruby_kernel:to_float("3.14").
+
+% 整数から浮動小数点数へ
+{ok, 42.0} = ruby_kernel:to_float(42).
+
+% 浮動小数点数から浮動小数点数へ（そのまま）
+{ok, 2.5} = ruby_kernel:to_float(2.5).
+```
+
+**String - 文字列に変換：**
+```erlang
+% 整数から文字列へ
+{ok, "42"} = ruby_kernel:to_string(42).
+
+% 浮動小数点数から文字列へ
+{ok, FloatStr} = ruby_kernel:to_string(3.14).
+
+% true/false/nilから文字列へ
+{ok, "true"} = ruby_kernel:to_string(true).
+{ok, "false"} = ruby_kernel:to_string(false).
+{ok, ""} = ruby_kernel:to_string(nil).
+```
+
+**Array - 配列に変換：**
+```erlang
+% リストはそのまま
+[1, 2, 3] = ruby_kernel:to_array([1, 2, 3]).
+
+% 非リスト値はリストでラップ
+[42] = ruby_kernel:to_array(42).
+["hello"] = ruby_kernel:to_array("hello").
+```
+
+#### オブジェクト検査メソッド
+
+**class - オブジェクトのクラスを取得：**
+```erlang
+% プリミティブ型のクラス
+'Integer' = ruby_kernel:get_class(42).
+'Float' = ruby_kernel:get_class(3.14).
+'String' = ruby_kernel:get_class("hello").
+'String' = ruby_kernel:get_class(<<"binary">>).
+'Array' = ruby_kernel:get_class([1, 2, 3]).
+'NilClass' = ruby_kernel:get_class(nil).
+'TrueClass' = ruby_kernel:get_class(true).
+'FalseClass' = ruby_kernel:get_class(false).
+'Symbol' = ruby_kernel:get_class(my_symbol).
+
+% オブジェクトのクラス
+{ok, Obj} = ruby_object_server:new_instance('MyClass').
+'MyClass' = ruby_kernel:get_class(Obj).
+```
+
+**is_a? - オブジェクトが指定クラスのインスタンスか判定（継承を考慮）：**
+```erlang
+% プリミティブ型の判定
+true = ruby_kernel:is_a(42, 'Integer').
+false = ruby_kernel:is_a(42, 'String').
+
+% オブジェクトと継承の判定
+ok = ruby_object_server:register_class('Animal', nil).
+ok = ruby_object_server:register_class('Dog', 'Animal').
+{ok, DogObj} = ruby_object_server:new_instance('Dog').
+
+true = ruby_kernel:is_a(DogObj, 'Dog').          % 自身のクラス
+true = ruby_kernel:is_a(DogObj, 'Animal').       % 親クラス
+true = ruby_kernel:is_a(DogObj, 'BasicObject').  % 祖先クラス
+false = ruby_kernel:is_a(DogObj, 'Cat').         % 無関係なクラス
+```
+
+**kind_of? - is_a?のエイリアス：**
+```erlang
+% is_a?と同じ
+true = ruby_kernel:kind_of(42, 'Integer').
+true = ruby_kernel:kind_of(DogObj, 'Animal').
+```
+
+**respond_to? - オブジェクトが指定メソッドに応答するか判定：**
+```erlang
+% メソッドテーブルにメソッドを定義
+ok = ruby_object_server:define_class_method(
+    'Dog',
+    bark,
+    #{name => bark, params => [], body => "Woof!", closure_env => nil}
+).
+
+{ok, DogObj} = ruby_object_server:new_instance('Dog').
+
+% メソッドの存在確認
+true = ruby_kernel:respond_to(DogObj, bark).   % 定義済み
+false = ruby_kernel:respond_to(DogObj, meow).  % 未定義
+```
+
+#### ファイル読み込みメソッド（基本実装）
+
+**require - ファイルを一度だけ読み込み：**
+```erlang
+% ファイルが存在する場合
+true = ruby_kernel:require("myfile.rb").
+
+% ファイルが存在しない場合
+false = ruby_kernel:require("nonexistent.rb").
+
+% 注: 現在は基本実装で、実際のファイル読み込みと実行は未実装
+```
+
+**load - ファイルを毎回読み込み：**
+```erlang
+% requireと同様、現在は基本実装
+true = ruby_kernel:load("myfile.rb").
+false = ruby_kernel:load("nonexistent.rb").
+```
+
+**require_relative - 相対パスでファイルを読み込み：**
+```erlang
+% 現在はrequireと同じ動作
+true = ruby_kernel:require_relative("../lib/myfile.rb").
+```
+
+#### 例外メソッド（基本実装）
+
+**raise - 例外を発生させる：**
+```erlang
+% メッセージ付きで例外を発生
+{error, {exception, "Something went wrong"}} = ruby_kernel:raise("Something went wrong").
+
+% 例外クラスとメッセージを指定
+{error, {exception, 'RuntimeError', "Error occurred"}} =
+    ruby_kernel:raise('RuntimeError', "Error occurred").
+```
+
+**fail - raiseのエイリアス：**
+```erlang
+% raiseと同じ
+{error, {exception, "Failed"}} = ruby_kernel:fail("Failed").
+{error, {exception, 'StandardError', "Failed"}} =
+    ruby_kernel:fail('StandardError', "Failed").
+```
+
+**catch/throw - 非ローカル脱出：**
+```erlang
+% throwで値を投げてcatchで受け取る
+CaughtValue = ruby_kernel:catch_throw(fun() ->
+    ruby_kernel:throw(42)
+end).
+% CaughtValue = 42
+
+% タグ付きで投げる
+CaughtValue2 = ruby_kernel:catch_throw(fun() ->
+    ruby_kernel:throw(my_tag, "value")
+end).
+% CaughtValue2 = {my_tag, "value"}
+
+% throwがない場合は通常の戻り値
+NormalValue = ruby_kernel:catch_throw(fun() ->
+    99
+end).
+% NormalValue = 99
+```
+
+**使用例：**
+```erlang
+% rubyアプリケーションを起動
+application:ensure_all_started(ruby).
+
+% 出力メソッドの使用
+ruby_kernel:puts("Hello, bruby!").
+ruby_kernel:print("Value: ").
+Result = ruby_kernel:p(42).
+
+% 型変換の使用
+{ok, Num} = ruby_kernel:to_integer("123").
+{ok, Str} = ruby_kernel:to_string(456).
+
+% オブジェクト検査の使用
+Class = ruby_kernel:get_class(42).
+IsInteger = ruby_kernel:is_a(42, 'Integer').
+
+% 例外処理の使用
+ErrorResult = ruby_kernel:raise("Error message").
+CaughtValue = ruby_kernel:catch_throw(fun() ->
+    % 何か処理...
+    ruby_kernel:throw(result_value)
+end).
+```
+
 ## 使い方
 
 ### 方法1: テストスクリプト
