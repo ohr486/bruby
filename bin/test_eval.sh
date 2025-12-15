@@ -125,9 +125,11 @@ io:format("  ruby_value:eql(42, 42.0) = ~p  (eql? requires same type)~n", [ruby_
 io:format("  ruby_value:identical(42, 42) = ~p~n~n", [ruby_value:identical(42, 42)]),
 
 io:format("~n=== Object System Demo ===~n"),
-io:format("~nThe ruby_object_server module provides the basic object model for bruby.~n"),
+io:format("~nThe ruby_object_server module provides the complete object model for bruby.~n"),
 io:format("This includes Object, Class, and Module base classes, object ID management,~n"),
-io:format("and instance variable management.~n~n"),
+io:format("instance variable management, and metaprogramming foundation (method tables,~n"),
+io:format("method lookup, method dispatch, method cache, attr_accessor/reader/writer,~n"),
+io:format("define_method, send, and method_missing).~n~n"),
 
 % rubyアプリケーションを起動（ruby_object_serverを含む）
 application:ensure_all_started(ruby),
@@ -136,7 +138,7 @@ application:ensure_all_started(ruby),
 io:format("Demo 1: Creating a new object~n"),
 MyClassAtom0 = list_to_atom("MyClass"),
 {ok, Obj1} = ruby_object_server:new_instance(MyClassAtom0),
-io:format("  {ok, Obj1} = ruby_object_server:new_instance('MyClass')~n"),
+io:format("  {ok, Obj1} = ruby_object_server:new_instance(MyClass)~n"),
 {ok, ObjClass1} = ruby_object_server:get_class(Obj1),
 io:format("  {ok, ~p} = ruby_object_server:get_class(Obj1)~n", [ObjClass1]),
 {ok, ObjId1} = ruby_object_server:get_object_id(Obj1),
@@ -173,8 +175,79 @@ MyClassAtom = list_to_atom("MyClass"),
 OtherClassAtom = list_to_atom("OtherClass"),
 IsInstance = ruby_object_server:is_instance_of(Obj3, MyClassAtom),
 NotInstance = ruby_object_server:is_instance_of(Obj3, OtherClassAtom),
-io:format("  ruby_object_server:is_instance_of(Obj3, 'MyClass') = ~p~n", [IsInstance]),
-io:format("  ruby_object_server:is_instance_of(Obj3, 'OtherClass') = ~p~n~n", [NotInstance]),
+io:format("  ruby_object_server:is_instance_of(Obj3, MyClass) = ~p~n", [IsInstance]),
+io:format("  ruby_object_server:is_instance_of(Obj3, OtherClass) = ~p~n~n", [NotInstance]),
+
+io:format("~n=== Metaprogramming Foundation Demo ===~n"),
+io:format("~nDemonstrating method tables, method lookup, method cache, and dynamic method definition.~n~n"),
+
+% Demo 7: Method table management
+io:format("Demo 7: Method table management~n"),
+PersonAtom = list_to_atom("Person"),
+GreetMethod = #{
+    name => greet,
+    params => [],
+    body => "Hello from method table!",
+    closure_env => nil
+},
+ok = ruby_object_server:define_class_method(PersonAtom, greet, GreetMethod),
+io:format("  Defined greet method on Person class~n"),
+{ok, _Method} = ruby_object_server:lookup_method(PersonAtom, greet),
+io:format("  Successfully looked up greet method~n"),
+{ok, Methods7} = ruby_object_server:get_class_methods(PersonAtom),
+io:format("  Person class has ~p methods~n~n", [maps:size(Methods7)]),
+
+% Demo 8: attr_accessor
+io:format("Demo 8: attr_accessor~n"),
+ProductAtom = list_to_atom("Product"),
+ok = ruby_object_server:attr_accessor(ProductAtom, [name, price]),
+io:format("  Created attr_accessor for :name and :price on Product~n"),
+{ok, ProductMethods} = ruby_object_server:get_class_methods(ProductAtom),
+io:format("  Product class now has ~p methods (name, name=, price, price=)~n~n", [maps:size(ProductMethods)]),
+
+% Demo 9: attr_reader
+io:format("Demo 9: attr_reader~n"),
+BookAtom = list_to_atom("Book"),
+ok = ruby_object_server:attr_reader(BookAtom, [title, author]),
+io:format("  Created attr_reader for :title and :author on Book~n"),
+{ok, BookMethods} = ruby_object_server:get_class_methods(BookAtom),
+io:format("  Book class now has ~p methods (title, author - read only)~n~n", [maps:size(BookMethods)]),
+
+% Demo 10: attr_writer
+io:format("Demo 10: attr_writer~n"),
+ConfigAtom = list_to_atom("Config"),
+ok = ruby_object_server:attr_writer(ConfigAtom, [debug, verbose]),
+io:format("  Created attr_writer for :debug and :verbose on Config~n"),
+{ok, ConfigMethods} = ruby_object_server:get_class_methods(ConfigAtom),
+io:format("  Config class now has ~p methods (debug=, verbose= - write only)~n~n", [maps:size(ConfigMethods)]),
+
+% Demo 11: define_method
+io:format("Demo 11: define_method~n"),
+CalculatorAtom = list_to_atom("Calculator"),
+AddMethod = #{
+    name => add,
+    params => [a, b],
+    body => {add_op, {var, a}, {var, b}},
+    closure_env => nil
+},
+ok = ruby_object_server:define_method(CalculatorAtom, add, [a, b], {add_op, {var, a}, {var, b}}),
+io:format("  Dynamically defined add method on Calculator~n"),
+{ok, _AddMethod} = ruby_object_server:lookup_method(CalculatorAtom, add),
+io:format("  Successfully looked up dynamically defined add method~n~n"),
+
+% Demo 12: method_missing
+io:format("Demo 12: method_missing~n"),
+DynamicAtom = list_to_atom("DynamicClass"),
+MissingHandler = #{
+    name => method_missing,
+    params => [method_name, args],
+    body => "Method not found handler",
+    closure_env => nil
+},
+ok = ruby_object_server:set_method_missing(DynamicAtom, method_missing, MissingHandler),
+io:format("  Set method_missing handler on DynamicClass~n"),
+HasMissing = ruby_object_server:has_method_missing(DynamicAtom),
+io:format("  DynamicClass has method_missing: ~p~n~n", [HasMissing]),
 
 io:format("~n=== Evaluator Test completed ===~n"),
 io:format("To try your own code, use:~n"),
@@ -192,9 +265,19 @@ io:format("  ruby_value:is_ruby_integer(42)~n"),
 io:format("  ruby_value:to_string(Value)~n"),
 io:format("  ruby_value:equal(Value1, Value2)~n"),
 io:format("~nFor object system operations:~n"),
-io:format("  {ok, Obj} = ruby_object_server:new_instance('MyClass')~n"),
-io:format("  ruby_object_server:set_instance_var(Obj, '@name', \"value\")~n"),
-io:format("  ruby_object_server:get_instance_var(Obj, '@name')~n"),
+io:format("  {ok, Obj} = ruby_object_server:new_instance(MyClass)~n"),
+io:format("  ruby_object_server:set_instance_var(Obj, Name, Value)~n"),
+io:format("  ruby_object_server:get_instance_var(Obj, Name)~n"),
 io:format("  ruby_object_server:get_class(Obj)~n"),
-io:format("  ruby_object_server:get_object_id(Obj)~n~n")
+io:format("  ruby_object_server:get_object_id(Obj)~n"),
+io:format("~nFor metaprogramming operations:~n"),
+io:format("  ruby_object_server:define_class_method(MyClass, method_name, MethodDef)~n"),
+io:format("  ruby_object_server:lookup_method(MyClass, method_name)~n"),
+io:format("  ruby_object_server:get_class_methods(MyClass)~n"),
+io:format("  ruby_object_server:attr_accessor(MyClass, [attr1, attr2])~n"),
+io:format("  ruby_object_server:attr_reader(MyClass, [attr])~n"),
+io:format("  ruby_object_server:attr_writer(MyClass, [attr])~n"),
+io:format("  ruby_object_server:define_method(MyClass, name, params, body)~n"),
+io:format("  ruby_object_server:method_send(obj, method_name, args, env)~n"),
+io:format("  ruby_object_server:set_method_missing(MyClass, handler)~n~n")
 ' -s init stop

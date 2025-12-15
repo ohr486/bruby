@@ -62,12 +62,18 @@ brubyはスコープ管理を専用モジュール `ruby_scope.erl` で実装し
 
 ### オブジェクトシステム（ruby_object_server.erl）
 
-brubyは基本的なオブジェクトシステムを実装しています。`ruby_object_server.erl`モジュールは、Rubyのオブジェクト指向プログラミングの基盤を提供します。
+brubyは完全なオブジェクトシステムを実装しています。`ruby_object_server.erl`モジュールは、Rubyのオブジェクト指向プログラミングとメタプログラミングの基盤を提供します。
 
 **主な機能：**
 - **オブジェクトID管理**: gen_serverでスレッドセーフに一意なIDを生成
 - **基底クラス**: Object、Class、Moduleの定義
 - **インスタンス変数管理**: オブジェクトごとのインスタンス変数の取得/設定
+- **メソッドテーブル管理**: クラスごとにメソッドを管理
+- **メソッド探索**: クラス階層を辿ってメソッドを検索
+- **メソッドディスパッチ**: オブジェクトに対するメソッド呼び出し
+- **メソッドキャッシュ**: メソッド探索の結果をキャッシュして高速化
+- **アクセサメソッド**: attr_reader、attr_writer、attr_accessorのサポート
+- **動的メソッド定義**: define_method、send、method_missingのサポート
 
 **オブジェクト構造：**
 ```erlang
@@ -115,6 +121,54 @@ Obj3 = ruby_object_server:set_instance_var(Obj2, '@age', 30),
 
 **オブジェクトID管理：**
 ruby_object_serverは gen_serverとして動作し、オブジェクトIDをスレッドセーフに生成します。IDは3から開始され（0-2は基底クラス用に予約）、オブジェクトごとに自動的にインクリメントされます。
+
+**メタプログラミング機能：**
+
+```erlang
+% メソッドテーブルの管理
+% クラスにメソッドを定義
+MethodDef = #{
+    name => greet,
+    params => [],
+    body => "Hello",
+    closure_env => nil
+},
+ok = ruby_object_server:define_class_method('MyClass', greet, MethodDef),
+
+% メソッドを検索
+{ok, Method} = ruby_object_server:lookup_method('MyClass', greet),
+
+% クラスの全メソッドを取得
+{ok, Methods} = ruby_object_server:get_class_methods('MyClass'),
+
+% attr_accessorの使用
+ok = ruby_object_server:attr_accessor('Person', [name, age]),
+% これにより、name、name=、age、age= メソッドが自動生成される
+
+% attr_readerの使用（読み取り専用）
+ok = ruby_object_server:attr_reader('Product', [price, title]),
+
+% attr_writerの使用（書き込み専用）
+ok = ruby_object_server:attr_writer('Config', [debug, verbose]),
+
+% define_methodで動的にメソッドを定義
+ok = ruby_object_server:define_method('Calculator', add, [a, b], {'+', {var, a}, {var, b}}),
+
+% sendでメソッドを動的に呼び出し
+{ok, Result, Env} = ruby_object_server:method_send(Obj, greet, []),
+
+% method_missingハンドラの設定
+MissingHandler = #{
+    name => method_missing,
+    params => [method_name, args],
+    body => "Unknown method",
+    closure_env => nil
+},
+ok = ruby_object_server:set_method_missing('MyClass', method_missing, MissingHandler),
+
+% method_missingが設定されているかチェック
+true = ruby_object_server:has_method_missing('MyClass').
+```
 
 ### 名前空間の管理（ruby_scope.erl）
 
@@ -609,6 +663,13 @@ end").
 - ✅ binding（バインディングオブジェクト）
 - ✅ 名前空間管理（定数、トップレベル、ネスト解決）
 - ✅ オブジェクトシステム（Object、Class、Module、オブジェクトID管理、インスタンス変数）
+- ✅ メタプログラミング基盤
+  - ✅ メソッドテーブル管理（クラスごと）
+  - ✅ メソッド探索（method lookup）
+  - ✅ メソッドディスパッチ
+  - ✅ メソッドキャッシュ
+  - ✅ attr_accessor/attr_reader/attr_writer
+  - ✅ define_method/send/method_missing
 
 ## 未実装の機能
 

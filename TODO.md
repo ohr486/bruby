@@ -146,13 +146,13 @@
 - [x] インスタンス変数の管理
   - [x] インスタンス変数の取得/設定
   - [x] インスタンス変数の一覧取得
-- [ ] メタプログラミング基盤
-  - [ ] メソッドテーブルの管理（クラスごと）
-  - [ ] メソッド探索 (method lookup) の実装
-  - [ ] メソッドディスパッチの実装
-  - [ ] メソッドキャッシュの実装
-  - [ ] attr_accessor/attr_reader/attr_writerの実装
-  - [ ] define_method/send/method_missingの実装
+- [x] メタプログラミング基盤
+  - [x] メソッドテーブルの管理（クラスごと）
+  - [x] メソッド探索 (method lookup) の実装
+  - [x] メソッドディスパッチの実装
+  - [x] メソッドキャッシュの実装
+  - [x] attr_accessor/attr_reader/attr_writerの実装
+  - [x] define_method/send/method_missingの実装
 - [ ] 継承とミックスイン
   - [ ] クラス継承チェーンの管理
   - [ ] superクラスの参照
