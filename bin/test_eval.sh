@@ -97,6 +97,33 @@ io:format("Demo 4: Nesting information~n"),
 Nesting = ruby_scope:get_nesting(BNS2),
 io:format("  Nesting of A::B namespace: ~p~n~n", [Nesting]),
 
+io:format("~n=== Ruby Value Module Demo ===~n"),
+io:format("~nThe ruby_value module provides type checking, type conversion, and equality operations.~n~n"),
+
+% 型チェックのデモ
+io:format("Demo 1: Type checking~n"),
+io:format("  ruby_value:is_ruby_integer(42) = ~p~n", [ruby_value:is_ruby_integer(42)]),
+io:format("  ruby_value:is_ruby_string(\"hello\") = ~p~n", [ruby_value:is_ruby_string("hello")]),
+io:format("  ruby_value:is_ruby_nil(nil) = ~p~n", [ruby_value:is_ruby_nil(nil)]),
+io:format("  ruby_value:is_ruby_number(3.14) = ~p~n~n", [ruby_value:is_ruby_number(3.14)]),
+
+% 型変換のデモ
+io:format("Demo 2: Type conversion~n"),
+{ok, Int1} = ruby_value:to_integer("42"),
+io:format("  ruby_value:to_integer(\"42\") = {ok, ~p}~n", [Int1]),
+{ok, Str1} = ruby_value:to_string(123),
+io:format("  ruby_value:to_string(123) = {ok, \"~s\"}~n", [Str1]),
+{ok, Float1} = ruby_value:to_float("3.14"),
+io:format("  ruby_value:to_float(\"3.14\") = {ok, ~p}~n~n", [Float1]),
+
+% 等価性チェックのデモ
+io:format("Demo 3: Equality checking~n"),
+io:format("  ruby_value:equal(42, 42) = ~p~n", [ruby_value:equal(42, 42)]),
+io:format("  ruby_value:equal(42, 42.0) = ~p  (== allows numeric type coercion)~n", [ruby_value:equal(42, 42.0)]),
+io:format("  ruby_value:eql(42, 42) = ~p~n", [ruby_value:eql(42, 42)]),
+io:format("  ruby_value:eql(42, 42.0) = ~p  (eql? requires same type)~n", [ruby_value:eql(42, 42.0)]),
+io:format("  ruby_value:identical(42, 42) = ~p~n~n", [ruby_value:identical(42, 42)]),
+
 io:format("~n=== Evaluator Test completed ===~n"),
 io:format("To try your own code, use:~n"),
 io:format("  erl -pa lib/ruby/ebin~n"),
@@ -107,5 +134,9 @@ NameAtom = list_to_atom("Name"),
 io:format("  ruby_scope:bind_constant(~p, Value, Namespace)~n", [NameAtom]),
 io:format("  ruby_scope:lookup_constant(~p, Namespace)~n", [NameAtom]),
 ABC_Atoms = [list_to_atom("A"), list_to_atom("B"), list_to_atom("C")],
-io:format("  ruby_scope:lookup_constant_path(~p, Namespace)~n~n", [ABC_Atoms])
+io:format("  ruby_scope:lookup_constant_path(~p, Namespace)~n", [ABC_Atoms]),
+io:format("~nFor value operations:~n"),
+io:format("  ruby_value:is_ruby_integer(42)~n"),
+io:format("  ruby_value:to_string(Value)~n"),
+io:format("  ruby_value:equal(Value1, Value2)~n~n")
 ' -s init stop
