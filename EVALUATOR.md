@@ -210,6 +210,147 @@ ok = ruby_object_server:set_method_missing('MyClass', method_missing, MissingHan
 true = ruby_object_server:has_method_missing('MyClass').
 ```
 
+### 組み込みクラス（builtin/）
+
+brubyは主要な組み込みクラスを実装しています。現在、数値クラス（Integer、Float）がサポートされています。
+
+#### 数値クラス（ruby_integer.erl、ruby_float.erl）
+
+**Integer クラスの主なメソッド：**
+
+**算術演算：**
+```erlang
+% 基本演算
+7 = ruby_integer:add(3, 4),
+-1 = ruby_integer:subtract(3, 4),
+12 = ruby_integer:multiply(3, 4),
+2 = ruby_integer:divide(10, 5),
+1 = ruby_integer:modulo(10, 3),
+
+% べき乗と絶対値
+8 = ruby_integer:power(2, 3),
+5 = ruby_integer:abs(-5),
+-5 = ruby_integer:negate(5).
+```
+
+**比較演算：**
+```erlang
+% 比較メソッド
+-1 = ruby_integer:compare(3, 5),    % 3 < 5
+0 = ruby_integer:compare(5, 5),     % 3 == 5
+1 = ruby_integer:compare(7, 5),     % 7 > 5
+
+true = ruby_integer:equal(5, 5),
+true = ruby_integer:less_than(3, 5),
+true = ruby_integer:greater_than(7, 5).
+```
+
+**型変換：**
+```erlang
+% 型変換メソッド
+42 = ruby_integer:to_integer(42),
+42.0 = ruby_integer:to_float(42),
+<<"42">> = ruby_integer:to_string(42),
+<<"1010">> = ruby_integer:to_string(10, 2),   % 2進数
+<<"A">> = ruby_integer:to_string(10, 16).     % 16進数
+```
+
+**その他のメソッド：**
+```erlang
+% 後続・前続
+6 = ruby_integer:succ(5),
+4 = ruby_integer:pred(5),
+
+% 判定メソッド
+true = ruby_integer:even(4),
+true = ruby_integer:odd(5),
+true = ruby_integer:zero(0),
+true = ruby_integer:positive(5),
+true = ruby_integer:negative(-5).
+```
+
+**イテレーションメソッド：**
+```erlang
+% times - 指定回数繰り返し
+ruby_integer:times(5, fun(I) -> io:format("~p ", [I]) end),
+% => 0 1 2 3 4
+
+% upto - 増加方向のイテレーション
+ruby_integer:upto(1, 5, fun(I) -> io:format("~p ", [I]) end),
+% => 1 2 3 4 5
+
+% downto - 減少方向のイテレーション
+ruby_integer:downto(5, 1, fun(I) -> io:format("~p ", [I]) end).
+% => 5 4 3 2 1
+```
+
+**ビット演算：**
+```erlang
+% ビット演算
+8 = ruby_integer:bitwise_and(12, 10),     % 1100 & 1010 = 1000
+14 = ruby_integer:bitwise_or(12, 10),     % 1100 | 1010 = 1110
+6 = ruby_integer:bitwise_xor(12, 10),     % 1100 ^ 1010 = 0110
+-6 = ruby_integer:bitwise_not(5),
+20 = ruby_integer:left_shift(5, 2),       % 5 << 2 = 20
+5 = ruby_integer:right_shift(20, 2).      % 20 >> 2 = 5
+```
+
+**Float クラスの主なメソッド：**
+
+**算術演算：**
+```erlang
+% 基本演算
+7.5 = ruby_float:add(3.5, 4.0),
+-0.5 = ruby_float:subtract(3.5, 4.0),
+14.0 = ruby_float:multiply(3.5, 4.0),
+2.5 = ruby_float:divide(10.0, 4.0),
+1.0 = ruby_float:modulo(10.0, 3.0),
+
+% べき乗と絶対値
+8.0 = ruby_float:power(2.0, 3),
+5.5 = ruby_float:abs(-5.5),
+-5.5 = ruby_float:negate(5.5).
+```
+
+**比較演算：**
+```erlang
+% 比較メソッド
+-1 = ruby_float:compare(3.5, 5.0),
+0 = ruby_float:compare(5.0, 5.0),
+1 = ruby_float:compare(7.5, 5.0),
+
+true = ruby_float:equal(5.0, 5.0),
+true = ruby_float:less_than(3.5, 5.0),
+true = ruby_float:greater_than(7.5, 5.0).
+```
+
+**型変換：**
+```erlang
+% 型変換メソッド
+42 = ruby_float:to_integer(42.7),      % 切り捨て
+42.5 = ruby_float:to_float(42.5),
+true = is_binary(ruby_float:to_string(42.5)).
+```
+
+**丸めメソッド：**
+```erlang
+% 丸めメソッド
+43 = ruby_float:ceil(42.3),           % 切り上げ
+42 = ruby_float:floor(42.7),          % 切り捨て
+43 = ruby_float:round(42.5),          % 四捨五入
+42.35 = ruby_float:round(42.345, 2),  % 精度指定の四捨五入
+42 = ruby_float:truncate(42.7).       % ゼロ方向への切り捨て
+```
+
+**判定メソッド：**
+```erlang
+% 判定メソッド
+true = ruby_float:finite(42.5),
+true = ruby_float:zero(0.0),
+true = ruby_float:positive(5.5),
+true = ruby_float:negative(-5.5).
+```
+
 ### 名前空間の管理（ruby_scope.erl）
 
 `ruby_scope.erl` は変数スコープに加えて、Rubyの名前空間（定数管理）もサポートしています。
