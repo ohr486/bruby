@@ -38,6 +38,24 @@ test() ->
   test_get_class_non_object(),
   test_get_object_id_non_object(),
 
+  % メタプログラミング基盤のテスト
+  test_define_class_method(),
+  test_lookup_method(),
+  test_lookup_method_not_found(),
+  test_get_class_methods(),
+  test_method_cache(),
+
+  % アクセサメソッドのテスト
+  test_attr_reader(),
+  test_attr_writer(),
+  test_attr_accessor(),
+
+  % 動的メソッド定義のテスト
+  test_define_method(),
+  test_method_send(),
+  test_set_method_missing(),
+  test_has_method_missing(),
+
   io:format("~n=== All Object System Tests Passed ===~n"),
   ok.
 
@@ -236,4 +254,135 @@ test_get_class_non_object() ->
 test_get_object_id_non_object() ->
   Result = ruby_object_server:get_object_id("string"),
   assert_equal({error, not_an_object}, Result, "get object id from non-object"),
+  ok.
+
+%% ========================================
+%% メタプログラミング基盤のテスト
+%% ========================================
+
+%% クラスメソッドを定義
+test_define_class_method() ->
+  MethodDef = #{
+    name => greet,
+    params => [],
+    body => "Hello",
+    closure_env => nil
+  },
+  ok = ruby_object_server:define_class_method('TestClass1', greet, MethodDef),
+  io:format("  [PASS] define class method~n"),
+  ok.
+
+%% メソッドを検索
+test_lookup_method() ->
+  MethodDef = #{
+    name => hello,
+    params => [],
+    body => "World",
+    closure_env => nil
+  },
+  ruby_object_server:define_class_method('TestClass2', hello, MethodDef),
+  {ok, Found} = ruby_object_server:lookup_method('TestClass2', hello),
+  #{name := hello} = Found,
+  io:format("  [PASS] lookup method~n"),
+  ok.
+
+%% 存在しないメソッドを検索
+test_lookup_method_not_found() ->
+  Result = ruby_object_server:lookup_method('NonExistentClass', nonexistent),
+  assert_equal(not_found, Result, "lookup method not found"),
+  ok.
+
+%% クラスの全メソッドを取得
+test_get_class_methods() ->
+  Method1 = #{name => m1, params => [], body => nil, closure_env => nil},
+  Method2 = #{name => m2, params => [], body => nil, closure_env => nil},
+  ruby_object_server:define_class_method('TestClass3', m1, Method1),
+  ruby_object_server:define_class_method('TestClass3', m2, Method2),
+  {ok, Methods} = ruby_object_server:get_class_methods('TestClass3'),
+  assert_equal(2, maps:size(Methods), "get class methods"),
+  ok.
+
+%% メソッドキャッシュの動作
+test_method_cache() ->
+  MethodDef = #{name => cached, params => [], body => nil, closure_env => nil},
+  ruby_object_server:define_class_method('TestClass4', cached, MethodDef),
+  % 1回目の検索（キャッシュなし）
+  {ok, _} = ruby_object_server:lookup_method('TestClass4', cached),
+  % 2回目の検索（キャッシュから）
+  {ok, _} = ruby_object_server:lookup_method('TestClass4', cached),
+  io:format("  [PASS] method cache~n"),
+  ok.
+
+%% ========================================
+%% アクセサメソッドのテスト
+%% ========================================
+
+%% attr_reader
+test_attr_reader() ->
+  ruby_object_server:attr_reader('ReaderClass', [name, age]),
+  {ok, Methods} = ruby_object_server:get_class_methods('ReaderClass'),
+  assert_equal(true, maps:is_key(name, Methods), "attr_reader creates getter - name"),
+  assert_equal(true, maps:is_key(age, Methods), "attr_reader creates getter - age"),
+  io:format("  [PASS] attr_reader~n"),
+  ok.
+
+%% attr_writer
+test_attr_writer() ->
+  ruby_object_server:attr_writer('WriterClass', [name, age]),
+  {ok, Methods} = ruby_object_server:get_class_methods('WriterClass'),
+  NameSetter = list_to_atom("name="),
+  AgeSetter = list_to_atom("age="),
+  assert_equal(true, maps:is_key(NameSetter, Methods), "attr_writer creates setter - name="),
+  assert_equal(true, maps:is_key(AgeSetter, Methods), "attr_writer creates setter - age="),
+  io:format("  [PASS] attr_writer~n"),
+  ok.
+
+%% attr_accessor
+test_attr_accessor() ->
+  ruby_object_server:attr_accessor('AccessorClass', [title, price]),
+  {ok, Methods} = ruby_object_server:get_class_methods('AccessorClass'),
+  TitleSetter = list_to_atom("title="),
+  PriceSetter = list_to_atom("price="),
+  assert_equal(4, maps:size(Methods), "attr_accessor creates 4 methods"),
+  assert_equal(true, maps:is_key(title, Methods), "attr_accessor creates getter - title"),
+  assert_equal(true, maps:is_key(TitleSetter, Methods), "attr_accessor creates setter - title="),
+  assert_equal(true, maps:is_key(price, Methods), "attr_accessor creates getter - price"),
+  assert_equal(true, maps:is_key(PriceSetter, Methods), "attr_accessor creates setter - price="),
+  io:format("  [PASS] attr_accessor~n"),
+  ok.
+
+%% ========================================
+%% 動的メソッド定義のテスト
+%% ========================================
+
+%% define_method
+test_define_method() ->
+  ruby_object_server:define_method('DynamicClass', add, [a, b], {add_op, a, b}),
+  {ok, Method} = ruby_object_server:lookup_method('DynamicClass', add),
+  #{name := add, params := [a, b]} = Method,
+  io:format("  [PASS] define_method~n"),
+  ok.
+
+%% method_send
+test_method_send() ->
+  MethodDef = #{name => test_send, params => [], body => "result", closure_env => nil},
+  ruby_object_server:define_class_method('SendClass', test_send, MethodDef),
+  {ok, Obj} = ruby_object_server:new_instance('SendClass'),
+  {ok, nil, _} = ruby_object_server:method_send(Obj, test_send, []),
+  io:format("  [PASS] method_send~n"),
+  ok.
+
+%% set_method_missing
+test_set_method_missing() ->
+  Handler = #{name => method_missing, params => [name, args], body => nil, closure_env => nil},
+  ok = ruby_object_server:set_method_missing('MissingClass', method_missing, Handler),
+  io:format("  [PASS] set_method_missing~n"),
+  ok.
+
+%% has_method_missing
+test_has_method_missing() ->
+  Handler = #{name => method_missing, params => [], body => nil, closure_env => nil},
+  ruby_object_server:set_method_missing('CheckClass', method_missing, Handler),
+  assert_equal(true, ruby_object_server:has_method_missing('CheckClass'), "has_method_missing returns true"),
+  assert_equal(false, ruby_object_server:has_method_missing('NoHandlerClass'), "has_method_missing returns false"),
   ok.
