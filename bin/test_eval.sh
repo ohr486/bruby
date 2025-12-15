@@ -279,5 +279,78 @@ io:format("  ruby_object_server:attr_reader(MyClass, [attr])~n"),
 io:format("  ruby_object_server:attr_writer(MyClass, [attr])~n"),
 io:format("  ruby_object_server:define_method(MyClass, name, params, body)~n"),
 io:format("  ruby_object_server:method_send(obj, method_name, args, env)~n"),
-io:format("  ruby_object_server:set_method_missing(MyClass, handler)~n~n")
+io:format("  ruby_object_server:set_method_missing(MyClass, handler)~n~n"),
+
+io:format("~n=== Inheritance and Mixin Demo ===~n"),
+io:format("~nThe ruby_object_server module now supports inheritance and mixins.~n"),
+io:format("This includes superclass, ancestors, include, and prepend.~n~n"),
+
+% 継承のデモ
+io:format("Demo 1: Class inheritance~n"),
+AnimalAtom = list_to_atom("Animal"),
+DogAtom = list_to_atom("Dog"),
+ok = ruby_object_server:register_class(AnimalAtom, nil),
+ok = ruby_object_server:register_class(DogAtom, AnimalAtom),
+io:format("  Registered classes: Animal (parent), Dog (child)~n"),
+{ok, SuperClass} = ruby_object_server:get_superclass(DogAtom),
+io:format("  Dog.superclass = ~p~n~n", [SuperClass]),
+
+io:format("Demo 2: Ancestors chain~n"),
+{ok, DogAncestors} = ruby_object_server:get_ancestors(DogAtom),
+io:format("  Dog.ancestors = ~p~n~n", [DogAncestors]),
+
+% モジュールのinclude
+io:format("Demo 3: Module include~n"),
+WalkableAtom = list_to_atom("Walkable"),
+ok = ruby_object_server:register_module(WalkableAtom),
+ok = ruby_object_server:include_module(DogAtom, WalkableAtom),
+io:format("  Dog.include(Walkable)~n"),
+{ok, DogAncestors2} = ruby_object_server:get_ancestors(DogAtom),
+io:format("  Dog.ancestors = ~p~n~n", [DogAncestors2]),
+
+% モジュールのprepend
+io:format("Demo 4: Module prepend~n"),
+RunnableAtom = list_to_atom("Runnable"),
+ok = ruby_object_server:register_module(RunnableAtom),
+ok = ruby_object_server:prepend_module(DogAtom, RunnableAtom),
+io:format("  Dog.prepend(Runnable)~n"),
+{ok, DogAncestors3} = ruby_object_server:get_ancestors(DogAtom),
+io:format("  Dog.ancestors = ~p~n", [DogAncestors3]),
+io:format("  (Note: Runnable comes before Dog due to prepend)~n~n"),
+
+% メソッド探索のデモ
+io:format("Demo 5: Method lookup with inheritance~n"),
+BaseAtom = list_to_atom("Base"),
+DerivedAtom = list_to_atom("Derived"),
+ok = ruby_object_server:register_class(BaseAtom, nil),
+ok = ruby_object_server:register_class(DerivedAtom, BaseAtom),
+BaseMethod = #{name => base_method, params => [], body => "from base", closure_env => nil},
+ok = ruby_object_server:define_class_method(BaseAtom, base_method, BaseMethod),
+{ok, Found} = ruby_object_server:lookup_method(DerivedAtom, base_method),
+io:format("  Defined base_method in Base class~n"),
+io:format("  Derived.lookup_method(:base_method) found: ~p~n~n", [Found]),
+
+% is_instance_of のデモ
+io:format("Demo 6: Instance check with inheritance~n"),
+MammalAtom = list_to_atom("Mammal"),
+CatAtom = list_to_atom("Cat"),
+ok = ruby_object_server:register_class(MammalAtom, nil),
+ok = ruby_object_server:register_class(CatAtom, MammalAtom),
+{ok, CatObj} = ruby_object_server:new_instance(CatAtom),
+IsCat = ruby_object_server:is_instance_of(CatObj, CatAtom),
+IsMammal = ruby_object_server:is_instance_of(CatObj, MammalAtom),
+BasicObjectAtom = list_to_atom("BasicObject"),
+IsBasicObject = ruby_object_server:is_instance_of(CatObj, BasicObjectAtom),
+io:format("  Created Cat instance~n"),
+io:format("  is_instance_of(obj, Cat) = ~p~n", [IsCat]),
+io:format("  is_instance_of(obj, Mammal) = ~p  (parent class)~n", [IsMammal]),
+io:format("  is_instance_of(obj, BasicObject) = ~p  (ancestor)~n~n", [IsBasicObject]),
+
+io:format("~nFor inheritance and mixin operations:~n"),
+io:format("  ruby_object_server:register_class(ClassName, Superclass)~n"),
+io:format("  ruby_object_server:register_module(ModuleName)~n"),
+io:format("  ruby_object_server:get_superclass(ClassName)~n"),
+io:format("  ruby_object_server:get_ancestors(ClassName)~n"),
+io:format("  ruby_object_server:include_module(ClassName, ModuleName)~n"),
+io:format("  ruby_object_server:prepend_module(ClassName, ModuleName)~n~n")
 ' -s init stop

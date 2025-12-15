@@ -51,6 +51,13 @@
     get_class/1,
     get_object_id/1,
     is_instance_of/2,
+    % クラス・モジュール管理
+    register_class/2,
+    register_module/1,
+    get_superclass/1,
+    get_ancestors/1,
+    include_module/2,
+    prepend_module/2,
     % メソッド管理
     define_class_method/3,
     lookup_method/2,
@@ -118,11 +125,19 @@
     id := object_id()
 }.
 
+-type class_metadata() :: #{
+    superclass := class_name() | nil,
+    included_modules := [atom()],   % includeされたモジュール（順序重要）
+    prepended_modules := [atom()],  % prependされたモジュール（順序重要）
+    is_module := boolean()          % モジュールかクラスか
+}.
+
 -type state() :: #{
     next_id := object_id(),
     class_methods := #{class_name() => #{atom() => method_def()}},  % クラスごとのメソッドテーブル
     method_cache := #{cache_key() => method_def() | not_found},     % メソッドキャッシュ
-    method_missing := #{class_name() => method_def()}               % method_missingハンドラ
+    method_missing := #{class_name() => method_def()},              % method_missingハンドラ
+    class_metadata := #{class_name() => class_metadata()}           % クラス・モジュールのメタデータ
 }.
 
 -type method_def() :: #{
@@ -215,15 +230,107 @@ get_object_id(_) ->
     {error, not_an_object}.
 
 %% @doc オブジェクトが指定したクラスのインスタンスかどうかを判定
+%%
+%% 継承チェーンを辿って判定します。
 -spec is_instance_of(ruby_object(), class_name()) -> boolean().
 is_instance_of(#{type := object, class := ClassName}, ClassName) ->
     true;
 is_instance_of(#{type := object, class := ObjClass}, CheckClass) ->
-    % 継承チェック（将来の拡張用）
-    % 現在は直接の一致のみチェック
-    ObjClass =:= CheckClass;
+    % 継承チェーン（祖先チェーン）を辿る
+    {ok, Ancestors} = get_ancestors(ObjClass),
+    lists:member(CheckClass, Ancestors);
 is_instance_of(_, _) ->
     false.
+
+%% @doc クラスを登録
+%%
+%% 新しいクラスを登録します。superclassを指定できます。
+%%
+%% パラメータ：
+%%   - ClassName: クラス名
+%%   - Superclass: 親クラス名（nilの場合はBasicObjectを継承）
+%%
+%% 戻り値：
+%%   - ok: 成功
+-spec register_class(class_name(), class_name() | nil) -> ok.
+register_class(ClassName, Superclass) when is_atom(ClassName) ->
+    % nilの場合はBasicObjectを親クラスとする
+    ActualSuperclass = case Superclass of
+        nil -> 'BasicObject';
+        _ -> Superclass
+    end,
+    gen_server:call(?MODULE, {register_class, ClassName, ActualSuperclass}).
+
+%% @doc モジュールを登録
+%%
+%% 新しいモジュールを登録します。
+%%
+%% パラメータ：
+%%   - ModuleName: モジュール名
+%%
+%% 戻り値：
+%%   - ok: 成功
+-spec register_module(atom()) -> ok.
+register_module(ModuleName) when is_atom(ModuleName) ->
+    gen_server:call(?MODULE, {register_module, ModuleName}).
+
+%% @doc クラスの親クラスを取得
+%%
+%% パラメータ：
+%%   - ClassName: クラス名
+%%
+%% 戻り値：
+%%   - {ok, Superclass}: 親クラス名（nilの場合は親クラスなし）
+%%   - {error, class_not_found}: クラスが見つからない場合
+-spec get_superclass(class_name()) -> {ok, class_name() | nil} | {error, class_not_found}.
+get_superclass(ClassName) when is_atom(ClassName) ->
+    gen_server:call(?MODULE, {get_superclass, ClassName}).
+
+%% @doc クラスの祖先チェーンを取得
+%%
+%% クラス自身、prependされたモジュール、includeされたモジュール、
+%% 親クラスの順で祖先を返します。
+%%
+%% パラメータ：
+%%   - ClassName: クラス名
+%%
+%% 戻り値：
+%%   - {ok, Ancestors}: 祖先のリスト
+-spec get_ancestors(class_name()) -> {ok, list(atom())}.
+get_ancestors(ClassName) when is_atom(ClassName) ->
+    gen_server:call(?MODULE, {get_ancestors, ClassName}).
+
+%% @doc モジュールをクラスにinclude
+%%
+%% モジュールをクラスに混ぜ込みます。
+%% 祖先チェーンに追加されます。
+%%
+%% パラメータ：
+%%   - ClassName: クラス名
+%%   - ModuleName: モジュール名
+%%
+%% 戻り値：
+%%   - ok: 成功
+%%   - {error, class_not_found}: クラスが見つからない場合
+-spec include_module(class_name(), atom()) -> ok | {error, class_not_found}.
+include_module(ClassName, ModuleName) when is_atom(ClassName), is_atom(ModuleName) ->
+    gen_server:call(?MODULE, {include_module, ClassName, ModuleName}).
+
+%% @doc モジュールをクラスにprepend
+%%
+%% モジュールをクラスの前に挿入します。
+%% クラスのメソッドよりもprependされたモジュールのメソッドが優先されます。
+%%
+%% パラメータ：
+%%   - ClassName: クラス名
+%%   - ModuleName: モジュール名
+%%
+%% 戻り値：
+%%   - ok: 成功
+%%   - {error, class_not_found}: クラスが見つからない場合
+-spec prepend_module(class_name(), atom()) -> ok | {error, class_not_found}.
+prepend_module(ClassName, ModuleName) when is_atom(ClassName), is_atom(ModuleName) ->
+    gen_server:call(?MODULE, {prepend_module, ClassName, ModuleName}).
 
 %% ============================================================================
 %% 基底クラスの定義
@@ -278,11 +385,45 @@ module_class() ->
 -spec init([]) -> {ok, state()}.
 init([]) ->
     % オブジェクトIDは3から開始（0, 1, 2は基底クラス用に予約）
+    % 基底クラスのメタデータを登録
+    ClassMetadata = #{
+        'BasicObject' => #{
+            superclass => nil,
+            included_modules => [],
+            prepended_modules => [],
+            is_module => false
+        },
+        'Object' => #{
+            superclass => 'BasicObject',
+            included_modules => ['Kernel'],
+            prepended_modules => [],
+            is_module => false
+        },
+        'Class' => #{
+            superclass => 'Object',
+            included_modules => [],
+            prepended_modules => [],
+            is_module => false
+        },
+        'Module' => #{
+            superclass => 'Object',
+            included_modules => [],
+            prepended_modules => [],
+            is_module => false
+        },
+        'Kernel' => #{
+            superclass => nil,
+            included_modules => [],
+            prepended_modules => [],
+            is_module => true
+        }
+    },
     {ok, #{
         next_id => 3,
-        class_methods => #{},  % クラスメソッドテーブル
-        method_cache => #{},   % メソッドキャッシュ
-        method_missing => #{}  % method_missingハンドラ
+        class_methods => #{},    % クラスメソッドテーブル
+        method_cache => #{},     % メソッドキャッシュ
+        method_missing => #{},   % method_missingハンドラ
+        class_metadata => ClassMetadata  % クラス・モジュールのメタデータ
     }}.
 
 %% @doc 同期呼び出しハンドラ
@@ -312,13 +453,13 @@ handle_call({define_method, ClassName, MethodName, MethodDef}, _From, State) ->
     {reply, ok, NewState};
 
 handle_call({lookup_method, ClassName, MethodName}, _From, State) ->
-    #{class_methods := ClassMethods, method_cache := Cache} = State,
+    #{class_methods := ClassMethods, method_cache := Cache, class_metadata := ClassMetadata} = State,
     CacheKey = {ClassName, MethodName},
     % まずキャッシュをチェック
     case maps:get(CacheKey, Cache, undefined) of
         undefined ->
             % キャッシュにない場合は検索
-            Result = do_lookup_method(ClassName, MethodName, ClassMethods),
+            Result = do_lookup_method(ClassName, MethodName, ClassMethods, ClassMetadata),
             % 結果をキャッシュに保存
             NewCache = maps:put(CacheKey, Result, Cache),
             NewState = State#{method_cache => NewCache},
@@ -349,6 +490,82 @@ handle_call({get_method_missing, ClassName}, _From, State) ->
     case maps:get(ClassName, MethodMissing, undefined) of
         undefined -> {reply, not_found, State};
         Handler -> {reply, {ok, Handler}, State}
+    end;
+
+handle_call({register_class, ClassName, Superclass}, _From, State) ->
+    #{class_metadata := ClassMetadata} = State,
+    Metadata = #{
+        superclass => Superclass,
+        included_modules => [],
+        prepended_modules => [],
+        is_module => false
+    },
+    NewClassMetadata = maps:put(ClassName, Metadata, ClassMetadata),
+    NewState = State#{class_metadata => NewClassMetadata},
+    {reply, ok, NewState};
+
+handle_call({register_module, ModuleName}, _From, State) ->
+    #{class_metadata := ClassMetadata} = State,
+    Metadata = #{
+        superclass => nil,
+        included_modules => [],
+        prepended_modules => [],
+        is_module => true
+    },
+    NewClassMetadata = maps:put(ModuleName, Metadata, ClassMetadata),
+    NewState = State#{class_metadata => NewClassMetadata},
+    {reply, ok, NewState};
+
+handle_call({get_superclass, ClassName}, _From, State) ->
+    #{class_metadata := ClassMetadata} = State,
+    case maps:get(ClassName, ClassMetadata, undefined) of
+        undefined -> {reply, {error, class_not_found}, State};
+        #{superclass := Superclass} -> {reply, {ok, Superclass}, State}
+    end;
+
+handle_call({get_ancestors, ClassName}, _From, State) ->
+    #{class_metadata := ClassMetadata} = State,
+    Ancestors = build_ancestors(ClassName, ClassMetadata),
+    {reply, {ok, Ancestors}, State};
+
+handle_call({include_module, ClassName, ModuleName}, _From, State) ->
+    #{class_metadata := ClassMetadata, method_cache := Cache} = State,
+    case maps:get(ClassName, ClassMetadata, undefined) of
+        undefined ->
+            {reply, {error, class_not_found}, State};
+        Metadata ->
+            #{included_modules := IncludedModules} = Metadata,
+            % モジュールがまだincludeされていない場合のみ追加
+            NewIncludedModules = case lists:member(ModuleName, IncludedModules) of
+                true -> IncludedModules;
+                false -> IncludedModules ++ [ModuleName]
+            end,
+            NewMetadata = Metadata#{included_modules => NewIncludedModules},
+            NewClassMetadata = maps:put(ClassName, NewMetadata, ClassMetadata),
+            % キャッシュをクリア
+            NewCache = clear_class_cache(ClassName, Cache),
+            NewState = State#{class_metadata => NewClassMetadata, method_cache => NewCache},
+            {reply, ok, NewState}
+    end;
+
+handle_call({prepend_module, ClassName, ModuleName}, _From, State) ->
+    #{class_metadata := ClassMetadata, method_cache := Cache} = State,
+    case maps:get(ClassName, ClassMetadata, undefined) of
+        undefined ->
+            {reply, {error, class_not_found}, State};
+        Metadata ->
+            #{prepended_modules := PrependedModules} = Metadata,
+            % モジュールがまだprependされていない場合のみ追加
+            NewPrependedModules = case lists:member(ModuleName, PrependedModules) of
+                true -> PrependedModules;
+                false -> [ModuleName | PrependedModules]
+            end,
+            NewMetadata = Metadata#{prepended_modules => NewPrependedModules},
+            NewClassMetadata = maps:put(ClassName, NewMetadata, ClassMetadata),
+            % キャッシュをクリア
+            NewCache = clear_class_cache(ClassName, Cache),
+            NewState = State#{class_metadata => NewClassMetadata, method_cache => NewCache},
+            {reply, ok, NewState}
     end;
 
 handle_call(_Request, _From, State) ->
@@ -650,22 +867,102 @@ clear_class_cache(ClassName, Cache) ->
         CName =/= ClassName
     end, Cache).
 
+%% @doc 祖先チェーンを構築
+%%
+%% クラス自身、prependされたモジュール、includeされたモジュール、
+%% 親クラスの順で祖先を構築します。
+%%
+%% Ruby の ancestors メソッドと同じ順序：
+%% [Class, PrependedModules, IncludedModules, Superclass, ...]
+-spec build_ancestors(class_name(), #{class_name() => class_metadata()}) -> list(atom()).
+build_ancestors(ClassName, ClassMetadata) ->
+    build_ancestors(ClassName, ClassMetadata, []).
+
+-spec build_ancestors(class_name(), #{class_name() => class_metadata()}, list(atom())) -> list(atom()).
+build_ancestors(ClassName, ClassMetadata, Visited) ->
+    % 循環参照を防ぐ
+    case lists:member(ClassName, Visited) of
+        true -> [];
+        false ->
+            case maps:get(ClassName, ClassMetadata, undefined) of
+                undefined ->
+                    % クラスが登録されていない場合は、クラス自身のみ
+                    [ClassName];
+                #{superclass := Superclass,
+                  included_modules := IncludedModules,
+                  prepended_modules := PrependedModules} ->
+                    % 祖先チェーンを構築
+                    % 1. prependされたモジュール（逆順）
+                    PrependedAncestors = lists:flatmap(fun(ModName) ->
+                        build_ancestors(ModName, ClassMetadata, [ClassName | Visited])
+                    end, lists:reverse(PrependedModules)),
+
+                    % 2. クラス自身
+                    SelfAncestors = [ClassName],
+
+                    % 3. includeされたモジュール（逆順）
+                    IncludedAncestors = lists:flatmap(fun(ModName) ->
+                        build_ancestors(ModName, ClassMetadata, [ClassName | Visited])
+                    end, lists:reverse(IncludedModules)),
+
+                    % 4. 親クラスの祖先
+                    SuperAncestors = case Superclass of
+                        nil -> [];
+                        _ -> build_ancestors(Superclass, ClassMetadata, [ClassName | Visited])
+                    end,
+
+                    % 結合して返す（重複を除去）
+                    AllAncestors = PrependedAncestors ++ SelfAncestors ++ IncludedAncestors ++ SuperAncestors,
+                    remove_duplicates(AllAncestors)
+            end
+    end.
+
+%% @doc リストから重複を除去（順序を保持）
+-spec remove_duplicates(list(atom())) -> list(atom()).
+remove_duplicates(List) ->
+    remove_duplicates(List, []).
+
+-spec remove_duplicates(list(atom()), list(atom())) -> list(atom()).
+remove_duplicates([], Acc) ->
+    lists:reverse(Acc);
+remove_duplicates([H|T], Acc) ->
+    case lists:member(H, Acc) of
+        true -> remove_duplicates(T, Acc);
+        false -> remove_duplicates(T, [H | Acc])
+    end.
+
 %% @doc メソッドを実際に検索（継承チェーンを辿る）
--spec do_lookup_method(class_name(), atom(), #{class_name() => #{atom() => method_def()}})
+%%
+%% 祖先チェーンを辿ってメソッドを検索します。
+%% prependされたモジュール、クラス自身、includeされたモジュール、
+%% 親クラスの順で検索します。
+-spec do_lookup_method(class_name(), atom(),
+                       #{class_name() => #{atom() => method_def()}},
+                       #{class_name() => class_metadata()})
     -> {ok, method_def()} | not_found.
-do_lookup_method(ClassName, MethodName, ClassMethods) ->
-    case maps:get(ClassName, ClassMethods, undefined) of
+do_lookup_method(ClassName, MethodName, ClassMethods, ClassMetadata) ->
+    % 祖先チェーンを構築
+    Ancestors = build_ancestors(ClassName, ClassMetadata),
+    % 祖先チェーンを辿ってメソッドを検索
+    search_method_in_ancestors(Ancestors, MethodName, ClassMethods).
+
+%% @doc 祖先チェーン内でメソッドを検索
+-spec search_method_in_ancestors(list(atom()), atom(), #{class_name() => #{atom() => method_def()}})
+    -> {ok, method_def()} | not_found.
+search_method_in_ancestors([], _MethodName, _ClassMethods) ->
+    not_found;
+search_method_in_ancestors([Ancestor | Rest], MethodName, ClassMethods) ->
+    case maps:get(Ancestor, ClassMethods, undefined) of
         undefined ->
-            % クラスが見つからない場合
-            not_found;
+            % このクラス/モジュールにメソッドテーブルがない場合は次へ
+            search_method_in_ancestors(Rest, MethodName, ClassMethods);
         Methods ->
             case maps:get(MethodName, Methods, undefined) of
                 undefined ->
-                    % メソッドが見つからない場合、親クラスを検索
-                    % 現時点では継承未実装のため、not_foundを返す
-                    % TODO: 継承実装時に親クラスを辿る処理を追加
-                    not_found;
+                    % メソッドが見つからない場合は次の祖先へ
+                    search_method_in_ancestors(Rest, MethodName, ClassMethods);
                 MethodDef ->
+                    % メソッドが見つかった
                     {ok, MethodDef}
             end
     end.

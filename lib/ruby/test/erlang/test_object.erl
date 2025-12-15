@@ -56,6 +56,22 @@ test() ->
   test_set_method_missing(),
   test_has_method_missing(),
 
+  % 継承とミックスインのテスト
+  test_register_class(),
+  test_register_module(),
+  test_get_superclass(),
+  test_get_ancestors_simple(),
+  test_get_ancestors_with_superclass(),
+  test_include_module(),
+  test_prepend_module(),
+  test_ancestors_with_include(),
+  test_ancestors_with_prepend(),
+  test_ancestors_with_include_and_prepend(),
+  test_method_lookup_with_inheritance(),
+  test_method_lookup_with_include(),
+  test_method_lookup_with_prepend(),
+  test_is_instance_of_with_inheritance(),
+
   io:format("~n=== All Object System Tests Passed ===~n"),
   ok.
 
@@ -386,3 +402,196 @@ test_has_method_missing() ->
   assert_equal(true, ruby_object_server:has_method_missing('CheckClass'), "has_method_missing returns true"),
   assert_equal(false, ruby_object_server:has_method_missing('NoHandlerClass'), "has_method_missing returns false"),
   ok.
+
+%% ========================================
+%% 継承とミックスインのテスト
+%% ========================================
+
+%% クラスを登録
+test_register_class() ->
+  ok = ruby_object_server:register_class('Animal', nil),
+  ok = ruby_object_server:register_class('Dog', 'Animal'),
+  io:format("  [PASS] register class~n"),
+  ok.
+
+%% モジュールを登録
+test_register_module() ->
+  ok = ruby_object_server:register_module('Walkable'),
+  ok = ruby_object_server:register_module('Swimmable'),
+  io:format("  [PASS] register module~n"),
+  ok.
+
+%% 親クラスを取得
+test_get_superclass() ->
+  ruby_object_server:register_class('Parent', nil),
+  ruby_object_server:register_class('Child', 'Parent'),
+  {ok, 'BasicObject'} = ruby_object_server:get_superclass('Parent'),
+  {ok, 'Parent'} = ruby_object_server:get_superclass('Child'),
+  io:format("  [PASS] get superclass~n"),
+  ok.
+
+%% 祖先チェーンを取得（シンプル）
+test_get_ancestors_simple() ->
+  ruby_object_server:register_class('SimpleClass', nil),
+  {ok, Ancestors} = ruby_object_server:get_ancestors('SimpleClass'),
+  % SimpleClass -> BasicObject
+  assert_equal(true, lists:member('SimpleClass', Ancestors), "ancestors contains SimpleClass"),
+  assert_equal(true, lists:member('BasicObject', Ancestors), "ancestors contains BasicObject"),
+  io:format("  [PASS] get ancestors simple~n"),
+  ok.
+
+%% 祖先チェーンを取得（継承あり）
+test_get_ancestors_with_superclass() ->
+  ruby_object_server:register_class('Vehicle', nil),
+  ruby_object_server:register_class('Car', 'Vehicle'),
+  ruby_object_server:register_class('SportsCar', 'Car'),
+  {ok, Ancestors} = ruby_object_server:get_ancestors('SportsCar'),
+  % SportsCar -> Car -> Vehicle -> BasicObject
+  assert_equal(true, lists:member('SportsCar', Ancestors), "ancestors contains SportsCar"),
+  assert_equal(true, lists:member('Car', Ancestors), "ancestors contains Car"),
+  assert_equal(true, lists:member('Vehicle', Ancestors), "ancestors contains Vehicle"),
+  assert_equal(true, lists:member('BasicObject', Ancestors), "ancestors contains BasicObject"),
+  % 順序チェック（子クラスが祖先より先に来る）
+  SportsCarIdx = string:str(lists:flatten(io_lib:format("~p", [Ancestors])), "SportsCar"),
+  CarIdx = string:str(lists:flatten(io_lib:format("~p", [Ancestors])), "Car"),
+  assert_equal(true, SportsCarIdx < CarIdx, "SportsCar comes before Car in ancestors"),
+  io:format("  [PASS] get ancestors with superclass~n"),
+  ok.
+
+%% モジュールをinclude
+test_include_module() ->
+  ruby_object_server:register_module('Flyable'),
+  ruby_object_server:register_class('Bird', nil),
+  ok = ruby_object_server:include_module('Bird', 'Flyable'),
+  io:format("  [PASS] include module~n"),
+  ok.
+
+%% モジュールをprepend
+test_prepend_module() ->
+  ruby_object_server:register_module('Logging'),
+  ruby_object_server:register_class('Service', nil),
+  ok = ruby_object_server:prepend_module('Service', 'Logging'),
+  io:format("  [PASS] prepend module~n"),
+  ok.
+
+%% 祖先チェーン（includeあり）
+test_ancestors_with_include() ->
+  ruby_object_server:register_module('M1'),
+  ruby_object_server:register_class('C1', nil),
+  ruby_object_server:include_module('C1', 'M1'),
+  {ok, Ancestors} = ruby_object_server:get_ancestors('C1'),
+  % C1 -> M1 -> BasicObject
+  assert_equal(true, lists:member('C1', Ancestors), "ancestors contains C1"),
+  assert_equal(true, lists:member('M1', Ancestors), "ancestors contains M1"),
+  io:format("  [PASS] ancestors with include~n"),
+  ok.
+
+%% 祖先チェーン（prependあり）
+test_ancestors_with_prepend() ->
+  ruby_object_server:register_module('M2'),
+  ruby_object_server:register_class('C2', nil),
+  ruby_object_server:prepend_module('C2', 'M2'),
+  {ok, Ancestors} = ruby_object_server:get_ancestors('C2'),
+  % M2 -> C2 -> BasicObject
+  assert_equal(true, lists:member('C2', Ancestors), "ancestors contains C2"),
+  assert_equal(true, lists:member('M2', Ancestors), "ancestors contains M2"),
+  % prependされたモジュールがクラスより先に来る
+  M2Pos = list_index('M2', Ancestors),
+  C2Pos = list_index('C2', Ancestors),
+  assert_equal(true, M2Pos < C2Pos, "M2 comes before C2 in ancestors (prepend)"),
+  io:format("  [PASS] ancestors with prepend~n"),
+  ok.
+
+%% 祖先チェーン（includeとprependの両方）
+test_ancestors_with_include_and_prepend() ->
+  ruby_object_server:register_module('M3'),
+  ruby_object_server:register_module('M4'),
+  ruby_object_server:register_class('C3', nil),
+  ruby_object_server:include_module('C3', 'M3'),
+  ruby_object_server:prepend_module('C3', 'M4'),
+  {ok, Ancestors} = ruby_object_server:get_ancestors('C3'),
+  % M4 (prepended) -> C3 -> M3 (included) -> BasicObject
+  M4Pos = list_index('M4', Ancestors),
+  C3Pos = list_index('C3', Ancestors),
+  M3Pos = list_index('M3', Ancestors),
+  assert_equal(true, M4Pos < C3Pos, "M4 (prepend) comes before C3"),
+  assert_equal(true, C3Pos < M3Pos, "C3 comes before M3 (include)"),
+  io:format("  [PASS] ancestors with include and prepend~n"),
+  ok.
+
+%% メソッド探索（継承）
+test_method_lookup_with_inheritance() ->
+  ruby_object_server:register_class('Base', nil),
+  ruby_object_server:register_class('Derived', 'Base'),
+
+  % Baseクラスにメソッドを定義
+  BaseMethod = #{name => base_method, params => [], body => "from base", closure_env => nil},
+  ruby_object_server:define_class_method('Base', base_method, BaseMethod),
+
+  % Derivedクラスから親クラスのメソッドを検索
+  {ok, Found} = ruby_object_server:lookup_method('Derived', base_method),
+  #{name := base_method} = Found,
+  io:format("  [PASS] method lookup with inheritance~n"),
+  ok.
+
+%% メソッド探索（include）
+test_method_lookup_with_include() ->
+  ruby_object_server:register_module('M5'),
+  ruby_object_server:register_class('C4', nil),
+  ruby_object_server:include_module('C4', 'M5'),
+
+  % モジュールにメソッドを定義
+  ModuleMethod = #{name => module_method, params => [], body => "from module", closure_env => nil},
+  ruby_object_server:define_class_method('M5', module_method, ModuleMethod),
+
+  % クラスからモジュールのメソッドを検索
+  {ok, Found} = ruby_object_server:lookup_method('C4', module_method),
+  #{name := module_method} = Found,
+  io:format("  [PASS] method lookup with include~n"),
+  ok.
+
+%% メソッド探索（prepend）
+test_method_lookup_with_prepend() ->
+  ruby_object_server:register_module('M6'),
+  ruby_object_server:register_class('C5', nil),
+  ruby_object_server:prepend_module('C5', 'M6'),
+
+  % クラスとモジュールに同じ名前のメソッドを定義
+  ClassMethod = #{name => shared_method, params => [], body => "from class", closure_env => nil},
+  ModuleMethod = #{name => shared_method, params => [], body => "from module", closure_env => nil},
+  ruby_object_server:define_class_method('C5', shared_method, ClassMethod),
+  ruby_object_server:define_class_method('M6', shared_method, ModuleMethod),
+
+  % prependされたモジュールのメソッドが優先される
+  {ok, Found} = ruby_object_server:lookup_method('C5', shared_method),
+  #{body := "from module"} = Found,
+  io:format("  [PASS] method lookup with prepend (module overrides class)~n"),
+  ok.
+
+%% is_instance_of（継承）
+test_is_instance_of_with_inheritance() ->
+  ruby_object_server:register_class('Mammal', nil),
+  ruby_object_server:register_class('Cat', 'Mammal'),
+  {ok, Obj} = ruby_object_server:new_instance('Cat'),
+
+  % Catクラスのインスタンス
+  assert_equal(true, ruby_object_server:is_instance_of(Obj, 'Cat'), "is_instance_of Cat"),
+  % 親クラスMammalのインスタンスでもある
+  assert_equal(true, ruby_object_server:is_instance_of(Obj, 'Mammal'), "is_instance_of Mammal (parent)"),
+  % BasicObjectのインスタンスでもある
+  assert_equal(true, ruby_object_server:is_instance_of(Obj, 'BasicObject'), "is_instance_of BasicObject"),
+  % 無関係なクラスのインスタンスではない
+  assert_equal(false, ruby_object_server:is_instance_of(Obj, 'Unrelated'), "not is_instance_of Unrelated"),
+  io:format("  [PASS] is_instance_of with inheritance~n"),
+  ok.
+
+%% ヘルパー関数: リスト内の要素のインデックスを取得（1から始まる）
+list_index(Element, List) ->
+  list_index(Element, List, 1).
+
+list_index(_, [], _) ->
+  -1;
+list_index(Element, [Element | _], Index) ->
+  Index;
+list_index(Element, [_ | Rest], Index) ->
+  list_index(Element, Rest, Index + 1).
