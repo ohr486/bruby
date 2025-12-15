@@ -28,7 +28,7 @@ make test
 
 トークナイザーとパーサーの動作を個別に確認できます。
 
-詳細は [TOKENIZER_PARSER.md](TOKENIZER_PARSER.md) を参照してください。
+詳細は [docs/TOKENIZER_PARSER.md](docs/TOKENIZER_PARSER.md) を参照してください。
 
 ### クイックスタート
 
@@ -40,13 +40,13 @@ make test
 ./bin/test_parser.sh "1 + 2 * 3"
 ```
 
-詳細な使い方、サポートしている構文、実装の仕組みは [TOKENIZER_PARSER.md](TOKENIZER_PARSER.md) を参照してください。
+詳細な使い方、サポートしている構文、実装の仕組みは [docs/TOKENIZER_PARSER.md](docs/TOKENIZER_PARSER.md) を参照してください。
 
 ## Test Evaluator (評価器のテスト)
 
 brubyの評価器は、Rubyコードを実際に実行できます。
 
-詳細は [EVALUATOR.md](EVALUATOR.md) を参照してください。
+詳細は [docs/EVALUATOR.md](docs/EVALUATOR.md) を参照してください。
 
 ### クイックスタート
 
@@ -73,7 +73,7 @@ ruby_evaluator:eval_string("def add(x, y) x + y end; add(3, 4)"). % メソッド
 - ✅ メソッド定義と呼び出し
 - ✅ クラス定義
 
-詳細なサンプルコードと使い方は [EVALUATOR.md](EVALUATOR.md) を参照してください。
+詳細なサンプルコードと使い方は [docs/EVALUATOR.md](docs/EVALUATOR.md) を参照してください。
 
 ## Run Test on Docker
 
