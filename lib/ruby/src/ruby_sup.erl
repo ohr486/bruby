@@ -1,5 +1,5 @@
 %% @doc Top-level supervisor for the Ruby application
-%% Manages ruby_config, ruby_code_server, and class_server workers
+%% Manages ruby_config, ruby_code_server, ruby_object_server, and class_server workers
 -module(ruby_sup).
 -export([init/1, start_link/0]).
 -behaviour(supervisor).
@@ -30,6 +30,14 @@ init(ok) ->
       2000,
       worker,
       [ruby_code_server]
+    },
+    {
+      ruby_object_server,
+      {ruby_object_server, start_link, []},
+      permanent,
+      2000,
+      worker,
+      [ruby_object_server]
     },
     {
       class_server,
