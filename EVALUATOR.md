@@ -122,6 +122,46 @@ Obj3 = ruby_object_server:set_instance_var(Obj2, '@age', 30),
 **オブジェクトID管理：**
 ruby_object_serverは gen_serverとして動作し、オブジェクトIDをスレッドセーフに生成します。IDは3から開始され（0-2は基底クラス用に予約）、オブジェクトごとに自動的にインクリメントされます。
 
+**継承とミックスイン機能：**
+
+brubyはRubyの継承とモジュールシステムを完全にサポートしています。
+
+```erlang
+% クラスを登録（親クラス指定）
+ok = ruby_object_server:register_class('Animal', nil),
+ok = ruby_object_server:register_class('Dog', 'Animal'),
+
+% モジュールを登録
+ok = ruby_object_server:register_module('Walkable'),
+ok = ruby_object_server:register_module('Runnable'),
+
+% 親クラスを取得
+{ok, 'Animal'} = ruby_object_server:get_superclass('Dog'),
+
+% 祖先チェーンを取得
+{ok, Ancestors} = ruby_object_server:get_ancestors('Dog'),
+% Ancestors = ['Dog', 'Animal', 'BasicObject']
+
+% モジュールをinclude（クラスの後に挿入）
+ok = ruby_object_server:include_module('Dog', 'Walkable'),
+{ok, Ancestors2} = ruby_object_server:get_ancestors('Dog'),
+% Ancestors2 = ['Dog', 'Walkable', 'Animal', 'BasicObject']
+
+% モジュールをprepend（クラスの前に挿入）
+ok = ruby_object_server:prepend_module('Dog', 'Runnable'),
+{ok, Ancestors3} = ruby_object_server:get_ancestors('Dog'),
+% Ancestors3 = ['Runnable', 'Dog', 'Walkable', 'Animal', 'BasicObject']
+
+% インスタンスチェック（継承を考慮）
+{ok, Dog} = ruby_object_server:new_instance('Dog'),
+true = ruby_object_server:is_instance_of(Dog, 'Dog'),
+true = ruby_object_server:is_instance_of(Dog, 'Animal'),      % 親クラス
+true = ruby_object_server:is_instance_of(Dog, 'BasicObject'), % 祖先
+
+% メソッド探索は祖先チェーンを辿る
+% prependされたモジュール → クラス → includeされたモジュール → 親クラス の順
+```
+
 **メタプログラミング機能：**
 
 ```erlang
@@ -670,19 +710,27 @@ end").
   - ✅ メソッドキャッシュ
   - ✅ attr_accessor/attr_reader/attr_writer
   - ✅ define_method/send/method_missing
+- ✅ 継承とミックスイン
+  - ✅ クラス継承（superclass）
+  - ✅ 祖先チェーン（ancestors）
+  - ✅ モジュールのinclude
+  - ✅ モジュールのprepend
+  - ✅ 継承を考慮したメソッド探索
+  - ✅ 継承を考慮したis_instance_of
 
 ## 未実装の機能
 
 以下の機能は現在未実装です：
 
-- ❌ クラスの継承とインスタンス化（new、インスタンス変数、インスタンスメソッド呼び出し）
+- ❌ クラスのインスタンス化（new、インスタンスメソッド呼び出し）
 - ❌ レシーバー付きメソッド呼び出し（obj.method）
+- ❌ モジュールのextend
 - ❌ Procオブジェクトの実行（.callメソッド）
 - ❌ 組み込みイテレータメソッド（each、map、selectなど）
 - ❌ シンボル
 - ❌ 配列・ハッシュ
 - ❌ 例外処理（rescue/ensure）
 - ❌ break/next文
-- ❌ モジュール定義
+- ❌ モジュール定義（構文レベル）
 
 これらの機能は今後のフェーズで実装予定です。

@@ -153,13 +153,13 @@
   - [x] メソッドキャッシュの実装
   - [x] attr_accessor/attr_reader/attr_writerの実装
   - [x] define_method/send/method_missingの実装
-- [ ] 継承とミックスイン
-  - [ ] クラス継承チェーンの管理
-  - [ ] superクラスの参照
-  - [ ] モジュールのインクルード
-  - [ ] モジュールのプリペンド
+- [x] 継承とミックスイン
+  - [x] クラス継承チェーンの管理
+  - [x] superクラスの参照
+  - [x] モジュールのインクルード
+  - [x] モジュールのプリペンド
   - [ ] モジュールのエクステンド
-  - [ ] 祖先チェーン (ancestors) の構築
+  - [x] 祖先チェーン (ancestors) の構築
 
 #### 組み込みクラス
 - [ ] 数値クラス (lib/ruby/src/builtin/ruby_integer.erl, ruby_float.erl)
