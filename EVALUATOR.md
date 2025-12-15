@@ -60,6 +60,62 @@ brubyはスコープ管理を専用モジュール `ruby_scope.erl` で実装し
 
 変数検索は現在のスコープから開始し、見つからなければ親スコープを順に辿ります。これにより、Rubyのスコープルールを正確に実装しています。
 
+### オブジェクトシステム（ruby_object_server.erl）
+
+brubyは基本的なオブジェクトシステムを実装しています。`ruby_object_server.erl`モジュールは、Rubyのオブジェクト指向プログラミングの基盤を提供します。
+
+**主な機能：**
+- **オブジェクトID管理**: gen_serverでスレッドセーフに一意なIDを生成
+- **基底クラス**: Object、Class、Moduleの定義
+- **インスタンス変数管理**: オブジェクトごとのインスタンス変数の取得/設定
+
+**オブジェクト構造：**
+```erlang
+#{
+    type => object,
+    class => 'MyClass',           % クラス名
+    id => 123,                    % 一意のオブジェクトID
+    instance_vars => #{           % インスタンス変数
+        '@name' => "Alice",
+        '@age' => 30
+    }
+}
+```
+
+**基底クラス定義：**
+- **Object**: すべてのRubyオブジェクトの基底クラス（ID: 0）
+- **Class**: クラスを表すクラス（ID: 1）
+- **Module**: モジュールを表すクラス（ID: 2）
+
+**使用例：**
+```erlang
+% オブジェクトシステムを起動（ruby_supが自動で起動）
+{ok, _} = application:start(ruby),
+
+% 新しいオブジェクトを作成
+{ok, Obj} = ruby_object_server:new_instance('MyClass'),
+
+% インスタンス変数を設定
+Obj2 = ruby_object_server:set_instance_var(Obj, '@name', "Alice"),
+Obj3 = ruby_object_server:set_instance_var(Obj2, '@age', 30),
+
+% インスタンス変数を取得
+{ok, "Alice"} = ruby_object_server:get_instance_var(Obj3, '@name'),
+{ok, 30} = ruby_object_server:get_instance_var(Obj3, '@age'),
+
+% すべてのインスタンス変数を取得
+{ok, #{'@name' => "Alice", '@age' => 30}} = ruby_object_server:get_instance_vars(Obj3),
+
+% オブジェクトのクラスを取得
+{ok, 'MyClass'} = ruby_object_server:get_class(Obj3),
+
+% オブジェクトIDを取得
+{ok, Id} = ruby_object_server:get_object_id(Obj3).
+```
+
+**オブジェクトID管理：**
+ruby_object_serverは gen_serverとして動作し、オブジェクトIDをスレッドセーフに生成します。IDは3から開始され（0-2は基底クラス用に予約）、オブジェクトごとに自動的にインクリメントされます。
+
 ### 名前空間の管理（ruby_scope.erl）
 
 `ruby_scope.erl` は変数スコープに加えて、Rubyの名前空間（定数管理）もサポートしています。
@@ -552,6 +608,7 @@ end").
 - ✅ クロージャ（環境のキャプチャ）
 - ✅ binding（バインディングオブジェクト）
 - ✅ 名前空間管理（定数、トップレベル、ネスト解決）
+- ✅ オブジェクトシステム（Object、Class、Module、オブジェクトID管理、インスタンス変数）
 
 ## 未実装の機能
 

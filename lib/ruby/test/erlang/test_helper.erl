@@ -14,6 +14,8 @@ test() ->
     test_evaluator:test(),
     test_blocks:test(),
     test_scope:test(),
+    test_value:test(),
+    test_object:test(),
     success
   catch
     Error:Reason:Stacktrace ->

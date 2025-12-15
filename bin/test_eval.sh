@@ -124,6 +124,58 @@ io:format("  ruby_value:eql(42, 42) = ~p~n", [ruby_value:eql(42, 42)]),
 io:format("  ruby_value:eql(42, 42.0) = ~p  (eql? requires same type)~n", [ruby_value:eql(42, 42.0)]),
 io:format("  ruby_value:identical(42, 42) = ~p~n~n", [ruby_value:identical(42, 42)]),
 
+io:format("~n=== Object System Demo ===~n"),
+io:format("~nThe ruby_object_server module provides the basic object model for bruby.~n"),
+io:format("This includes Object, Class, and Module base classes, object ID management,~n"),
+io:format("and instance variable management.~n~n"),
+
+% rubyアプリケーションを起動（ruby_object_serverを含む）
+application:ensure_all_started(ruby),
+
+% オブジェクトシステムのデモ
+io:format("Demo 1: Creating a new object~n"),
+MyClassAtom0 = list_to_atom("MyClass"),
+{ok, Obj1} = ruby_object_server:new_instance(MyClassAtom0),
+io:format("  {ok, Obj1} = ruby_object_server:new_instance('MyClass')~n"),
+{ok, ObjClass1} = ruby_object_server:get_class(Obj1),
+io:format("  {ok, ~p} = ruby_object_server:get_class(Obj1)~n", [ObjClass1]),
+{ok, ObjId1} = ruby_object_server:get_object_id(Obj1),
+io:format("  {ok, ~p} = ruby_object_server:get_object_id(Obj1)~n~n", [ObjId1]),
+
+io:format("Demo 2: Setting instance variables~n"),
+NameAtom2 = list_to_atom("@name"),
+AgeAtom = list_to_atom("@age"),
+Obj2 = ruby_object_server:set_instance_var(Obj1, NameAtom2, "Alice"),
+Obj3 = ruby_object_server:set_instance_var(Obj2, AgeAtom, 30),
+io:format("  Obj2 = ruby_object_server:set_instance_var(Obj1, ~p, \"Alice\")~n", [NameAtom2]),
+io:format("  Obj3 = ruby_object_server:set_instance_var(Obj2, ~p, 30)~n~n", [AgeAtom]),
+
+io:format("Demo 3: Getting instance variables~n"),
+{ok, NameValue} = ruby_object_server:get_instance_var(Obj3, NameAtom2),
+{ok, AgeValue} = ruby_object_server:get_instance_var(Obj3, AgeAtom),
+io:format("  {ok, \"~s\"} = ruby_object_server:get_instance_var(Obj3, ~p)~n", [NameValue, NameAtom2]),
+io:format("  {ok, ~p} = ruby_object_server:get_instance_var(Obj3, ~p)~n~n", [AgeValue, AgeAtom]),
+
+io:format("Demo 4: Getting all instance variables~n"),
+{ok, AllVars} = ruby_object_server:get_instance_vars(Obj3),
+io:format("  {ok, ~p} = ruby_object_server:get_instance_vars(Obj3)~n~n", [AllVars]),
+
+io:format("Demo 5: Base classes~n"),
+ObjectClass = ruby_object_server:object_class(),
+ClassClass = ruby_object_server:class_class(),
+ModuleClass = ruby_object_server:module_class(),
+io:format("  Object class: ~p~n", [ObjectClass]),
+io:format("  Class class:  ~p~n", [ClassClass]),
+io:format("  Module class: ~p~n~n", [ModuleClass]),
+
+io:format("Demo 6: Instance check~n"),
+MyClassAtom = list_to_atom("MyClass"),
+OtherClassAtom = list_to_atom("OtherClass"),
+IsInstance = ruby_object_server:is_instance_of(Obj3, MyClassAtom),
+NotInstance = ruby_object_server:is_instance_of(Obj3, OtherClassAtom),
+io:format("  ruby_object_server:is_instance_of(Obj3, 'MyClass') = ~p~n", [IsInstance]),
+io:format("  ruby_object_server:is_instance_of(Obj3, 'OtherClass') = ~p~n~n", [NotInstance]),
+
 io:format("~n=== Evaluator Test completed ===~n"),
 io:format("To try your own code, use:~n"),
 io:format("  erl -pa lib/ruby/ebin~n"),
@@ -138,5 +190,11 @@ io:format("  ruby_scope:lookup_constant_path(~p, Namespace)~n", [ABC_Atoms]),
 io:format("~nFor value operations:~n"),
 io:format("  ruby_value:is_ruby_integer(42)~n"),
 io:format("  ruby_value:to_string(Value)~n"),
-io:format("  ruby_value:equal(Value1, Value2)~n~n")
+io:format("  ruby_value:equal(Value1, Value2)~n"),
+io:format("~nFor object system operations:~n"),
+io:format("  {ok, Obj} = ruby_object_server:new_instance('MyClass')~n"),
+io:format("  ruby_object_server:set_instance_var(Obj, '@name', \"value\")~n"),
+io:format("  ruby_object_server:get_instance_var(Obj, '@name')~n"),
+io:format("  ruby_object_server:get_class(Obj)~n"),
+io:format("  ruby_object_server:get_object_id(Obj)~n~n")
 ' -s init stop
