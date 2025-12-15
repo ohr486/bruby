@@ -120,21 +120,21 @@
 ### ランタイム実装
 
 #### 値の表現 (lib/ruby/src/ruby_value.erl)
-- [ ] Ruby値のErlang表現の設計
-  - [ ] 整数値の表現
-  - [ ] 浮動小数点数の表現
-  - [ ] 文字列の表現
-  - [ ] シンボルの表現
-  - [ ] true/false/nilの表現
-  - [ ] オブジェクトの表現（レコード or マップ）
-- [ ] 型変換関数の実装
-  - [ ] Erlang値 → Ruby値
-  - [ ] Ruby値 → Erlang値
-  - [ ] 型チェック関数（is_integer/is_string等）
-- [ ] 値の比較と等価性
-  - [ ] ==（値の等価性）
-  - [ ] eql?（型と値の等価性）
-  - [ ] equal?（オブジェクトの同一性）
+- [x] Ruby値のErlang表現の設計
+  - [x] 整数値の表現
+  - [x] 浮動小数点数の表現
+  - [x] 文字列の表現
+  - [x] シンボルの表現
+  - [x] true/false/nilの表現
+  - [x] オブジェクトの表現（レコード or マップ）
+- [x] 型変換関数の実装
+  - [x] Erlang値 → Ruby値
+  - [x] Ruby値 → Erlang値
+  - [x] 型チェック関数（is_integer/is_string等）
+- [x] 値の比較と等価性
+  - [x] ==（値の等価性）
+  - [x] eql?（型と値の等価性）
+  - [x] equal?（オブジェクトの同一性）
 
 #### オブジェクトシステム (lib/ruby/src/ruby_object.erl)
 - [ ] 基本オブジェクトモデルの実装

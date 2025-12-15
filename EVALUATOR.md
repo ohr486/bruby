@@ -4,6 +4,39 @@ brubyの評価器は、Rubyコードを実際に実行できます。
 
 ## アーキテクチャ
 
+### 値の表現（ruby_value.erl）
+
+brubyはRuby値をErlangのネイティブな型で効率的に表現します。`ruby_value.erl`モジュールは型チェック、型変換、等価性チェックなどの基本的な操作を提供します。
+
+**Ruby値のErlang表現：**
+- **整数値**: Erlangの整数型 (integer()) - 例: 42, -100, 0
+- **浮動小数点数**: Erlangの浮動小数点型 (float()) - 例: 3.14, -0.5, 1.0e10
+- **文字列**: Erlangの文字列リスト (string()) またはバイナリ (binary()) - 例: "hello", <<"world">>
+- **シンボル**: Erlangのアトム (atom()) - 例: symbol, 'my_symbol'
+- **真偽値**: Erlangのアトム true | false
+- **nil**: Erlangのアトム nil
+- **オブジェクト**: マップ形式 #{type => object, class => atom(), ...}
+
+**主な機能：**
+- **型チェック関数**: is_ruby_integer/1, is_ruby_string/1, is_ruby_nil/1など
+- **型変換関数**: to_integer/1, to_float/1, to_string/1など
+- **等価性チェック**: equal/2 (Rubyの==), eql/2 (Rubyのeql?), identical/2 (Rubyのequal?)
+
+**使用例：**
+```erlang
+% 型チェック
+true = ruby_value:is_ruby_integer(42),
+true = ruby_value:is_ruby_string("hello"),
+
+% 型変換
+{ok, 42} = ruby_value:to_integer("42"),
+{ok, "123"} = ruby_value:to_string(123),
+
+% 等価性チェック
+true = ruby_value:equal(42, 42.0),  % 数値は型を超えて等しい
+false = ruby_value:eql(42, 42.0).   % 型が異なる
+```
+
 ### スコープ管理（ruby_scope.erl）
 
 brubyはスコープ管理を専用モジュール `ruby_scope.erl` で実装しています。スコープチェーンを使用して、変数の束縛と検索を効率的に行います。
