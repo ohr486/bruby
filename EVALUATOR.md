@@ -27,6 +27,50 @@ brubyはスコープ管理を専用モジュール `ruby_scope.erl` で実装し
 
 変数検索は現在のスコープから開始し、見つからなければ親スコープを順に辿ります。これにより、Rubyのスコープルールを正確に実装しています。
 
+### 名前空間の管理（ruby_scope.erl）
+
+`ruby_scope.erl` は変数スコープに加えて、Rubyの名前空間（定数管理）もサポートしています。
+
+**主な機能：**
+- **トップレベルの名前空間**: グローバルな定数を管理（`::Object` に相当）
+- **クラス/モジュールの名前空間**: 各クラス・モジュールが独自の定数テーブルを持つ
+- **ネストした名前空間の解決**: `A::B::C` のような階層的な定数アクセスをサポート
+
+**名前空間チェーンの仕組み：**
+```
+A::B::C 名前空間 (C定数)
+    ↓ parent
+A::B 名前空間 (B定数)
+    ↓ parent
+A 名前空間 (A定数)
+    ↓ parent
+トップレベル名前空間 (グローバル定数)
+    ↓ parent
+   nil
+```
+
+**使用例：**
+```erlang
+% トップレベル名前空間を作成
+TopLevel = ruby_scope:new_namespace(),
+
+% A モジュールを定義
+ANS = ruby_scope:new_namespace('A', TopLevel),
+TopLevel2 = ruby_scope:bind_constant('A', ANS, TopLevel),
+
+% A::B モジュールを定義
+BNS = ruby_scope:new_namespace('B', ANS),
+ANS2 = ruby_scope:bind_constant('B', BNS, ANS),
+
+% A::B::C 定数を定義
+BNS2 = ruby_scope:bind_constant('C', 42, BNS),
+
+% A::B::C を解決
+{ok, 42} = ruby_scope:lookup_constant_path(['A', 'B', 'C'], TopLevel2).
+```
+
+定数検索は現在の名前空間から開始し、見つからなければ親名前空間を順に辿ります。これにより、Rubyの定数検索ルールを実装しています。
+
 ## 使い方
 
 ### 方法1: テストスクリプト
@@ -474,6 +518,7 @@ end").
 - ✅ Proc.new/lambda
 - ✅ クロージャ（環境のキャプチャ）
 - ✅ binding（バインディングオブジェクト）
+- ✅ 名前空間管理（定数、トップレベル、ネスト解決）
 
 ## 未実装の機能
 
