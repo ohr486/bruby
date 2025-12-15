@@ -460,6 +460,85 @@ io:format("  ruby_float:add(3.5, 4.0)~n"),
 io:format("  ruby_float:round(42.345, 2)~n"),
 io:format("  ruby_float:ceil(42.3)~n~n"),
 
+io:format("~n=== String Class Demo ===~n"),
+io:format("~nThe ruby_string module provides built-in methods for string manipulation.~n~n"),
+
+% 文字列結合のデモ
+io:format("Demo 1: String concatenation~n"),
+StrConcat = ruby_string:concat(<<"hello ">>, <<"world">>),
+io:format("  ruby_string:concat(<<\\\"hello \\\">>, <<\\\"world\\\">>) = ~s~n~n", [StrConcat]),
+
+% 文字列分割のデモ
+io:format("Demo 2: String splitting~n"),
+StrSplit = ruby_string:split(<<"hello world">>),
+io:format("  ruby_string:split(<<\\\"hello world\\\">>) = ~p~n", [StrSplit]),
+StrSplit2 = ruby_string:split(<<"a,b,c">>, <<",">>),
+io:format("  ruby_string:split(<<\\\"a,b,c\\\">>, <<\\\",\\\">>) = ~p~n", [StrSplit2]),
+StrChars = ruby_string:chars(<<"hello">>),
+io:format("  ruby_string:chars(<<\\\"hello\\\">>) = ~p~n~n", [StrChars]),
+
+% 文字列検索のデモ
+io:format("Demo 3: String search~n"),
+StrIndex1 = ruby_string:index(<<"foo">>, <<"o">>),
+io:format("  ruby_string:index(<<\\\"foo\\\">>, <<\\\"o\\\">>) = ~p~n", [StrIndex1]),
+StrRindex = ruby_string:rindex(<<"foo">>, <<"o">>),
+io:format("  ruby_string:rindex(<<\\\"foo\\\">>, <<\\\"o\\\">>) = ~p~n~n", [StrRindex]),
+
+% 文字列置換のデモ
+io:format("Demo 4: String substitution~n"),
+StrSub = ruby_string:sub(<<"hello">>, <<"l">>, <<"X">>),
+io:format("  ruby_string:sub(<<\\\"hello\\\">>, <<\\\"l\\\">>, <<\\\"X\\\">>) = ~s~n", [StrSub]),
+StrGsub = ruby_string:gsub(<<"hello">>, <<"l">>, <<"X">>),
+io:format("  ruby_string:gsub(<<\\\"hello\\\">>, <<\\\"l\\\">>, <<\\\"X\\\">>) = ~s~n~n", [StrGsub]),
+
+% 大文字・小文字変換のデモ
+io:format("Demo 5: Case conversion~n"),
+StrUp = ruby_string:upcase(<<"hello">>),
+io:format("  ruby_string:upcase(<<\\\"hello\\\">>) = ~s~n", [StrUp]),
+StrDown = ruby_string:downcase(<<"HELLO">>),
+io:format("  ruby_string:downcase(<<\\\"HELLO\\\">>) = ~s~n", [StrDown]),
+StrCap = ruby_string:capitalize(<<"hello world">>),
+io:format("  ruby_string:capitalize(<<\\\"hello world\\\">>) = ~s~n~n", [StrCap]),
+
+% 長さとサイズのデモ
+io:format("Demo 6: Length and size~n"),
+StrLen = ruby_string:length(<<"hello">>),
+io:format("  ruby_string:length(<<\\\"hello\\\">>) = ~p~n", [StrLen]),
+StrSize = ruby_string:size(<<"hello">>),
+io:format("  ruby_string:size(<<\\\"hello\\\">>) = ~p~n", [StrSize]),
+StrBytesize = ruby_string:bytesize(<<"hello">>),
+io:format("  ruby_string:bytesize(<<\\\"hello\\\">>) = ~p~n", [StrBytesize]),
+StrEmpty = ruby_string:empty(<<>>),
+io:format("  ruby_string:empty(<<>>) = ~p~n~n", [StrEmpty]),
+
+% 空白削除のデモ
+io:format("Demo 7: Trimming~n"),
+StrStrip = ruby_string:strip(<<"  hello  ">>),
+io:format("  ruby_string:strip(<<\\\"  hello  \\\">>) = ~s~n", [StrStrip]),
+StrChomp = ruby_string:chomp(<<"hello\\n">>),
+io:format("  ruby_string:chomp(<<\\\"hello\\\\n\\\">>) = ~s~n~n", [StrChomp]),
+
+% その他の操作のデモ
+io:format("Demo 8: Other operations~n"),
+StrRev = ruby_string:reverse(<<"hello">>),
+io:format("  ruby_string:reverse(<<\\\"hello\\\">>) = ~s~n", [StrRev]),
+{ok, StrToInt} = ruby_string:to_integer(<<"42">>),
+io:format("  ruby_string:to_integer(<<\\\"42\\\">>) = {ok, ~p}~n", [StrToInt]),
+{ok, StrToFloat} = ruby_string:to_float(<<"3.14">>),
+io:format("  ruby_string:to_float(<<\\\"3.14\\\">>) = {ok, ~p}~n~n", [StrToFloat]),
+
+io:format("~nFor string class operations:~n"),
+io:format("  ruby_string:concat(str1, str2)~n"),
+io:format("  ruby_string:split(str, delimiter)~n"),
+io:format("  ruby_string:chars(str)~n"),
+io:format("  ruby_string:index(str, substring)~n"),
+io:format("  ruby_string:gsub(str, pattern, replacement)~n"),
+io:format("  ruby_string:upcase(str)~n"),
+io:format("  ruby_string:downcase(str)~n"),
+io:format("  ruby_string:capitalize(str)~n"),
+io:format("  ruby_string:strip(str)~n"),
+io:format("  ruby_string:reverse(str)~n~n"),
+
 io:format("~n=== Kernel Module Demo ===~n"),
 io:format("~nThe ruby_kernel module provides built-in methods for Ruby Kernel module.~n"),
 io:format("Kernel is mixed into Object, so its methods are available in every Ruby object.~n~n"),

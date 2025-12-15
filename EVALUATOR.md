@@ -212,7 +212,171 @@ true = ruby_object_server:has_method_missing('MyClass').
 
 ### 組み込みクラス（builtin/）
 
-brubyは主要な組み込みクラスを実装しています。現在、数値クラス（Integer、Float）がサポートされています。
+brubyは主要な組み込みクラスを実装しています。現在、数値クラス（Integer、Float）と文字列クラス（String）がサポートされています。
+
+#### 文字列クラス（ruby_string.erl）
+
+**String クラスの主なメソッド：**
+
+**文字列の結合：**
+```erlang
+% concat - 文字列を結合
+<<"hello world">> = ruby_string:concat(<<"hello ">>, <<"world">>),
+<<"foobar">> = ruby_string:concat(<<"foo">>, <<"bar">>),
+
+% append - concatのエイリアス
+<<"hello world">> = ruby_string:append(<<"hello ">>, <<"world">>).
+```
+
+**文字列の分割：**
+```erlang
+% split - デリミタで分割（デフォルトは空白）
+[<<"hello">>, <<"world">>] = ruby_string:split(<<"hello world">>),
+[<<"a">>, <<"b">>, <<"c">>] = ruby_string:split(<<"a,b,c">>, <<",">>),
+
+% chars - 文字単位に分割
+[<<"h">>, <<"e">>, <<"l">>, <<"l">>, <<"o">>] = ruby_string:chars(<<"hello">>),
+[] = ruby_string:chars(<<>>).
+```
+
+**文字列の検索：**
+```erlang
+% index - 最初の出現位置を取得
+0 = ruby_string:index(<<"foo">>, <<"f">>),
+1 = ruby_string:index(<<"foo">>, <<"o">>),
+nil = ruby_string:index(<<"foo">>, <<"x">>),
+
+% オフセット指定
+2 = ruby_string:index(<<"foo">>, <<"o">>, 2),
+2 = ruby_string:index(<<"foo">>, <<"o">>, -1),  % 負のオフセット
+
+% rindex - 最後の出現位置を取得
+2 = ruby_string:rindex(<<"foo">>, <<"o">>),
+1 = ruby_string:rindex(<<"foo">>, <<"oo">>),
+nil = ruby_string:rindex(<<"foo">>, <<"x">>).
+```
+
+**文字列の置換：**
+```erlang
+% sub - 最初の出現を置換
+<<"fXo">> = ruby_string:sub(<<"foo">>, <<"o">>, <<"X">>),
+<<"hXllo">> = ruby_string:sub(<<"hello">>, <<"e">>, <<"X">>),
+
+% gsub - すべての出現を置換
+<<"fXX">> = ruby_string:gsub(<<"foo">>, <<"o">>, <<"X">>),
+<<"heXXo">> = ruby_string:gsub(<<"hello">>, <<"l">>, <<"X">>),
+<<"XXX">> = ruby_string:gsub(<<"aaa">>, <<"a">>, <<"X">>),
+
+% 空文字列で置換（削除）
+<<"f">> = ruby_string:gsub(<<"foo">>, <<"o">>, <<>>).
+```
+
+**大文字・小文字変換：**
+```erlang
+% upcase - すべて大文字に
+<<"HELLO">> = ruby_string:upcase(<<"hello">>),
+<<"ABC">> = ruby_string:upcase(<<"abc">>),
+
+% downcase - すべて小文字に
+<<"hello">> = ruby_string:downcase(<<"HELLO">>),
+<<"abc">> = ruby_string:downcase(<<"ABC">>),
+
+% capitalize - 先頭のみ大文字、残りは小文字に
+<<"Hello">> = ruby_string:capitalize(<<"hello">>),
+<<"Hello world">> = ruby_string:capitalize(<<"hello world">>),
+
+% swapcase - 大文字と小文字を入れ替え
+<<"HELLO">> = ruby_string:swapcase(<<"hello">>),
+<<"hello">> = ruby_string:swapcase(<<"HELLO">>),
+<<"hELLO wORLD">> = ruby_string:swapcase(<<"Hello World">>).
+```
+
+**長さとサイズ：**
+```erlang
+% length - 文字数を取得
+5 = ruby_string:length(<<"hello">>),
+0 = ruby_string:length(<<>>),
+
+% size - lengthのエイリアス
+5 = ruby_string:size(<<"hello">>),
+
+% bytesize - バイト数を取得
+5 = ruby_string:bytesize(<<"hello">>),
+0 = ruby_string:bytesize(<<>>),
+
+% empty - 空文字列か判定
+true = ruby_string:empty(<<>>),
+false = ruby_string:empty(<<"hello">>).
+```
+
+**文字アクセス：**
+```erlang
+% chr - インデックスで文字を取得
+<<"h">> = ruby_string:chr(<<"hello">>, 0),
+<<"e">> = ruby_string:chr(<<"hello">>, 1),
+nil = ruby_string:chr(<<"hello">>, 5),
+
+% 負のインデックス（末尾から）
+<<"o">> = ruby_string:chr(<<"hello">>, -1),
+<<"l">> = ruby_string:chr(<<"hello">>, -2).
+```
+
+**空白の削除：**
+```erlang
+% strip - 前後の空白を削除
+<<"hello">> = ruby_string:strip(<<"  hello  ">>),
+<<"hello world">> = ruby_string:strip(<<"  hello world  ">>),
+
+% lstrip - 先頭の空白を削除
+<<"hello  ">> = ruby_string:lstrip(<<"  hello  ">>),
+
+% rstrip - 末尾の空白を削除
+<<"  hello">> = ruby_string:rstrip(<<"  hello  ">>),
+
+% chomp - 末尾の改行を削除
+<<"hello">> = ruby_string:chomp(<<"hello\n">>),
+<<"hello\nworld">> = ruby_string:chomp(<<"hello\nworld\n">>),
+
+% カスタムセパレータで削除
+<<"hello">> = ruby_string:chomp(<<"hello world">>, <<" world">>).
+```
+
+**その他の操作：**
+```erlang
+% reverse - 文字列を反転
+<<"olleh">> = ruby_string:reverse(<<"hello">>),
+<<"cba">> = ruby_string:reverse(<<"abc">>),
+
+% to_string - 文字列に変換
+<<"hello">> = ruby_string:to_string(<<"hello">>),
+<<"42">> = ruby_string:to_string(42),
+
+% to_integer - 整数に変換
+{ok, 42} = ruby_string:to_integer(<<"42">>),
+{ok, -100} = ruby_string:to_integer(<<"-100">>),
+{error, invalid_integer} = ruby_string:to_integer(<<"hello">>),
+
+% to_float - 浮動小数点数に変換
+{ok, 3.14} = ruby_string:to_float(<<"3.14">>),
+{ok, 42.0} = ruby_string:to_float(<<"42">>),
+{error, invalid_float} = ruby_string:to_float(<<"hello">>),
+
+% to_atom - アトムに変換
+hello = ruby_string:to_atom(<<"hello">>),
+test = ruby_string:to_atom("test").
+```
+
+**比較：**
+```erlang
+% equal - 文字列が等しいか判定
+true = ruby_string:equal(<<"hello">>, <<"hello">>),
+false = ruby_string:equal(<<"hello">>, <<"world">>),
+
+% compare - 辞書順で比較（-1, 0, 1を返す）
+0 = ruby_string:compare(<<"hello">>, <<"hello">>),
+-1 = ruby_string:compare(<<"abc">>, <<"xyz">>),
+1 = ruby_string:compare(<<"xyz">>, <<"abc">>).
+```
 
 #### 数値クラス（ruby_integer.erl、ruby_float.erl）
 
