@@ -16,6 +16,7 @@ test() ->
     test_scope:test(),
     test_value:test(),
     test_object:test(),
+    test_numeric:test(),
     success
   catch
     Error:Reason:Stacktrace ->

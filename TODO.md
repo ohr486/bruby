@@ -162,11 +162,11 @@
   - [x] 祖先チェーン (ancestors) の構築
 
 #### 組み込みクラス
-- [ ] 数値クラス (lib/ruby/src/builtin/ruby_integer.erl, ruby_float.erl)
-  - [ ] Integerクラスの基本メソッド (+, -, *, /, %, **, abs, etc.)
-  - [ ] Floatクラスの基本メソッド
-  - [ ] Numericクラスの共通メソッド
-  - [ ] 型変換メソッド (to_i, to_f, to_s)
+- [x] 数値クラス (lib/ruby/src/builtin/ruby_integer.erl, ruby_float.erl)
+  - [x] Integerクラスの基本メソッド (+, -, *, /, %, **, abs, etc.)
+  - [x] Floatクラスの基本メソッド
+  - [x] Numericクラスの共通メソッド
+  - [x] 型変換メソッド (to_i, to_f, to_s)
 - [ ] 文字列クラス (lib/ruby/src/builtin/ruby_string.erl)
   - [ ] 文字列の結合・分割 (+, <<, split, chars)
   - [ ] 文字列の検索・置換 (index, gsub, sub)
