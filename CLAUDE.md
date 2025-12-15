@@ -64,7 +64,7 @@ make test_epmd
 # パーサーのテスト（AST出力を確認）
 ./bin/test_parser.sh "1 + 2 * 3"
 
-# 評価器のテスト（10個のサンプルRubyプログラムを実行）
+# 評価器のテスト（複数のサンプルRubyプログラムを実行）
 ./bin/test_eval.sh
 ```
 
@@ -83,6 +83,7 @@ cd docker
 
 各アプリケーションは標準的なOTP規約に従っています：
 - `lib/<app>/src/`: ソースファイル (.erl, .yrl, .hrl, .app.src)
+- `lib/<app>/src/builtin/`: Ruby組み込みクラスの実装 (ruby アプリのみ)
 - `lib/<app>/ebin/`: コンパイル済みbeamファイルと.appファイル (生成)
 - `lib/<app>/test/erlang/`: テストファイル
 - `lib/<app>/test/ebin/`: コンパイル済みテストbeamファイル (生成)
